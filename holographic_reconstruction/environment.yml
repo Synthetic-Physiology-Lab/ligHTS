@@ -1,0 +1,31 @@
+name: holoreader
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10.13
+
+  # Core numerical + I/O
+  - numpy=1.24.4
+  - scipy=1.11.4
+
+  # File formats
+  - pillow=10.0.1
+  - tifffile=2023.7.10
+
+  # Plotting
+  - matplotlib=3.7.3
+
+  # Utilities
+  - tqdm=4.66.1
+
+  # GUI (tkinter)
+  - tk=8.6.13
+
+  - pip
+  - pip:
+      # Image registration / warping (cv2)
+      - opencv-python-headless==4.9.0.80
+
+  # Optional acceleration
+  # - numba=0.58.1
+  # - cupy  # install a CUDA-matched build separately if desired

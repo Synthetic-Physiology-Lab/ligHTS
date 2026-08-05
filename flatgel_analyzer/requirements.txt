@@ -1,0 +1,9 @@
+numpy==1.26.4
+scipy==1.12.0
+pandas==2.2.2
+matplotlib==3.8.4
+opencv-python-headless==4.9.0.80
+aicsimageio[nd2]==4.14.0
+nd2==0.10.0
+tifffile
+openpyxl==3.1.5

@@ -1,0 +1,11 @@
+[MASTER]
+ignore=__pycache__
+[MESSAGES CONTROL]
+disable=missing-module-docstring,missing-function-docstring,too-many-locals, C0103
+[FORMAT]
+max-line-length=100
+
+[TYPECHECK]
+generated-members = cv2.*, numpy.random.*
+[DESIGN]
+max-args = 10

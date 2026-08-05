@@ -1,0 +1,17 @@
+[MASTER]
+ignore=__pycache__
+
+[MESSAGES CONTROL]
+disable=
+    E1101,
+    C0114, C0115, C0116,
+    C0103,
+    C0301,
+    R0801,
+    R0912, R0913, R0914, R0915, R0917
+
+[FORMAT]
+max-line-length=100
+
+[TYPECHECK]
+generated-members = cv2.*

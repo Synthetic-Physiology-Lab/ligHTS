@@ -1,0 +1,12 @@
+
+# Generated
+__pycache__/
+*.pyc
+gel_surface_out/
+*.png
+*.csv
+.DS_Store
+*.log
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
