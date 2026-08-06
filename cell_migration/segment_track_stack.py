@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import tifffile
 from tqdm import tqdm
-from skimage.measure import regionprops_table, find_contours
+from skimage.measure import regionprops_table, regionprops, find_contours
 import matplotlib.pyplot as plt
 from matplotlib import patches
 from matplotlib import colormaps
@@ -49,7 +49,7 @@ LIMIT_FRAME_SAMPLES = 8         # frames sampled to estimate intensity limits
 
 # --- Cellpose configuration -------------------------------------------------
 MODEL_TYPE = "cyto3"
-USE_GPU = False                 # CLI --gpu overrides this; main() stays CPU-only
+USE_GPU = False                 # CLI --gpu overrides this
 CELLPROB_THRESHOLD = -2.0
 FLOW_THRESHOLD = 0.8
 MIN_SIZE = 8
@@ -218,14 +218,14 @@ def segment_and_track(folder, diameter, um_per_px, time_gap_min):
         )
         print(f"Saved {output_tif}")
 
-        regionprops = []
+        regionprops_frames = []
         for frame, label in enumerate(labels_stack):
             df = pd.DataFrame(
                 regionprops_table(label, properties=["label", "centroid"])
             )
             df["frame"] = frame
-            regionprops.append(df)
-        regionprops_df = pd.concat(regionprops)
+            regionprops_frames.append(df)
+        regionprops_df = pd.concat(regionprops_frames)
 
         if "frame_y" in regionprops_df.columns:
             regionprops_df.rename(columns={"frame_y": "frame"}, inplace=True)
@@ -267,6 +267,17 @@ def segment_and_track(folder, diameter, um_per_px, time_gap_min):
             for i, track_id in enumerate(track_ids)
         }
 
+        # Pre-group each track's coordinates into NumPy arrays once (original
+        # row order preserved), so per-frame drawing is a cheap array slice
+        # instead of a full-DataFrame scan per track per frame.
+        track_arrays = {}
+        for track_id, group in track_data.groupby("track_id", sort=False):
+            track_arrays[track_id] = (
+                group["time"].to_numpy(),
+                group["x"].to_numpy(),
+                group["y"].to_numpy(),
+            )
+
         output_video = folder / f"{in_file.stem}_tracking.mov"
         writer = iio.get_writer(
             str(output_video),
@@ -277,8 +288,11 @@ def segment_and_track(folder, diameter, um_per_px, time_gap_min):
             ffmpeg_params=["-crf", "18", "-preset", "slow", "-loglevel", "error"],
         )
 
+        # Build the figure once and clear it between frames; reallocating a
+        # dpi=150 figure per frame is the dominant matplotlib cost.
+        fig, ax = plt.subplots(figsize=(6, 6), dpi=150)
         for t in range(num_frames):
-            fig, ax = plt.subplots(figsize=(6, 6), dpi=150)
+            ax.cla()
             if num_channels == 1:
                 ax.imshow(image_stack[t, 0], cmap="gray", vmin=vmin, vmax=vmax)
             else:
@@ -287,27 +301,33 @@ def segment_and_track(folder, diameter, um_per_px, time_gap_min):
             ax.set_ylim(height, 0)
             ax.axis("off")
 
-            # Draw contours
+            # Draw contours. Compute each contour inside the label's bounding
+            # box (padded by 1px of background) instead of masking the whole
+            # frame: marching-squares is identical there, just offset back.
             frame_labels = labels_stack[t]
-            for label_id in np.unique(frame_labels):
-                if label_id == 0:
-                    continue
-                mask = (frame_labels == label_id).astype(np.uint8)
-                contours = find_contours(mask, level=0.5)
+            for region in regionprops(frame_labels):
+                label_id = region.label
+                minr, minc, maxr, maxc = region.bbox
+                r0, c0 = max(minr - 1, 0), max(minc - 1, 0)
+                r1, c1 = min(maxr + 1, height), min(maxc + 1, width)
+                sub = (frame_labels[r0:r1, c0:c1] == label_id).astype(np.uint8)
+                contours = find_contours(sub, level=0.5)
                 color = label_colors.get(label_id, (1, 1, 1))
                 for contour in contours:
-                    ax.plot(contour[:, 1], contour[:, 0], color=color, linewidth=1)
+                    ax.plot(
+                        contour[:, 1] + c0, contour[:, 0] + r0, color=color, linewidth=1
+                    )
 
             # Draw tracks
             for track_id in track_ids:
-                track = track_data[track_data["track_id"] == track_id]
-                tail = track[(track["time"] <= t) & (track["time"] >= t - tail_length)]
-                if not tail.empty:
+                times, xs, ys = track_arrays[track_id]
+                in_tail = (times <= t) & (times >= t - tail_length)
+                if in_tail.any():
                     color = track_colors[track_id]
-                    ax.plot(tail["x"], tail["y"], color=color, linewidth=1, alpha=0.8)
-                    current = tail[tail["time"] == t]
-                    if not current.empty:
-                        x, y = current.iloc[0]["x"], current.iloc[0]["y"]
+                    ax.plot(xs[in_tail], ys[in_tail], color=color, linewidth=1, alpha=0.8)
+                    at_t = times == t
+                    if at_t.any():
+                        x, y = xs[at_t][0], ys[at_t][0]
                         ax.add_patch(
                             patches.Circle(
                                 (x, y),
@@ -347,8 +367,8 @@ def segment_and_track(folder, diameter, um_per_px, time_gap_min):
             buf, (w, h) = fig.canvas.print_to_buffer()
             frame = np.frombuffer(buf, dtype=np.uint8).reshape((h, w, 4))[:, :, :3]
             writer.append_data(frame)
-            plt.close(fig)
 
+        plt.close(fig)
         writer.close()
         print(f"Video saved to {output_video}")
 

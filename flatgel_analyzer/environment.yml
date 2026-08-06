@@ -11,5 +11,4 @@ dependencies:
   - pip
   - pip:
       - opencv-python-headless==4.9.0.80
-      - aicsimageio[nd2]==4.14.0
       - nd2==0.10.0
