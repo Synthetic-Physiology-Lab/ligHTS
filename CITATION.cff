@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "LigHTS: Massively Parallel Biomimetic Photo-Functionalization for Imaging-Based Ultra-High-Throughput Screening"
+authors:
+  - family-names: Enrico
+    given-names: Alessandro
+    orcid: "https://orcid.org/0000-0002-8821-6759"
+  - family-names: Rigolli
+    given-names: Sara
+    orcid: "https://orcid.org/0009-0007-4910-2939"
+  - family-names: Zimmermann
+    given-names: Julius
+    orcid: "https://orcid.org/0000-0003-1486-0426"
+  - family-names: Pezzotti
+    given-names: Melissa
+    orcid: "https://orcid.org/0009-0008-4737-1825"
+  - family-names: Torchia
+    given-names: Eloisa
+    orcid: "https://orcid.org/0000-0001-6401-9438"
+  - family-names: Di Sante
+    given-names: Moises
+    orcid: "https://orcid.org/0000-0002-4174-1257"
+  - family-names: de Jong
+    given-names: Hugo
+    orcid: "https://orcid.org/0000-0002-3000-8316"
+  - family-names: Iamele
+    given-names: Luisa
+    orcid: "https://orcid.org/0009-0002-9407-3894"
+  - family-names: Auricchio
+    given-names: Ferdinando
+    orcid: "https://orcid.org/0000-0002-3735-2400"
+  - family-names: Pasqualini
+    given-names: "Francesco S."
+    orcid: "https://orcid.org/0000-0001-7038-3121"
+date-released: 2026-08-07
+url: "https://github.com/Synthetic-Physiology-Lab/ligHTS"
+repository-code: "https://github.com/Synthetic-Physiology-Lab/ligHTS"
+license: MIT
