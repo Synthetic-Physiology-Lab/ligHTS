@@ -34,7 +34,7 @@ from collections import defaultdict
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # ----------------------------- Constants ------------------------------
-DELTA_N: float = 0.0064
+DELTA_N: float = 0.00278 # updated following calibration
 WAVELENGTH_UM: float = 0.635
 SCALE_UM_PER_RAD: float = WAVELENGTH_UM / (2.0 * math.pi * DELTA_N)
 WINDOW_MIN_UM: float = -25.0

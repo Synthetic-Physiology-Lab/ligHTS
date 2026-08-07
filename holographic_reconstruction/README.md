@@ -25,6 +25,15 @@ Workflow
 10) Analyze all stacks, extracting surface geometry parameters
 11) Saves processed data
 
+Optional calibration against nanoindentation and confocal images
+-------------------
+1) create in the same folder of the code a subfolder called tiff containing the tiff version of confocal calibration data
+2) create in the same folder of the code a subfolder named conf_out containinf grooves_recap.csv as created via groove_analyzer.py
+3) create in the same folder of the code two nested folders HPI/HPI containing the raw holographic microscopy data
+4) create in the same folder of the code a folder named NanoindentationChiaro containing raw nanoindentation data
+5) run run_calibration.py
+6) run make_figure.py to get the final image
+
 Optional validation
 ---------------------
 To verify groove_analyzer_holo.py credibility, run validation pipeline:
@@ -36,7 +45,7 @@ Optical and physical constants of the model
 ---------------------------------------------
 
 - Wavelength λ = 0.635 µm
-- Refractive index contrast Δn = 0.0064
+- Refractive index contrast Δn = 0.00278
 - Phase → height scale  
   \[
   h = \phi \cdot \frac{\lambda}{2\pi\Delta n} \approx 15.77\ \mu m/\text{rad}
@@ -98,6 +107,16 @@ To run the geometrical analysis on folders containing TIFF stacks and divided pe
 python groove_analyzer_holo.py
 ```
 ## Advanced Options
+To calibrate the holographic reconstructor against nanoindentation and confocal datasets, after creating a folder tree as described before:
+a) run the ancillary code via:
+```
+python run_calibration.py
+```
+b) generate figure panel via:
+```
+python make_figure.py
+```
+
 To reproduce synthetic dataset validation process and obtain metrics as reported in VALIDATION_REPORT.md:
 
 a) generate syntethic dataset via:
