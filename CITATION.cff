@@ -32,6 +32,7 @@ authors:
   - family-names: Pasqualini
     given-names: "Francesco S."
     orcid: "https://orcid.org/0000-0001-7038-3121"
+doi: 10.5281/zenodo.21840233
 date-released: 2026-08-07
 url: "https://github.com/Synthetic-Physiology-Lab/ligHTS"
 repository-code: "https://github.com/Synthetic-Physiology-Lab/ligHTS"

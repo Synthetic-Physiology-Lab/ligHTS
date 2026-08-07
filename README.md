@@ -1,7 +1,6 @@
 # LigHTS full repository
 
-<!-- After creating the first Zenodo release, replace XXXXXXX with the concept DOI (the "Cite all versions" one). -->
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21840233.svg)](https://doi.org/10.5281/zenodo.21840233)
 
 This repository contains the environments and scripts used to extract and analyze all data supporting the claims of
 the manuscript "LigHTS: Massively Parallel Biomimetic Photo-Functionalization for Imaging-Based Ultra-High-Throughput Screening"
