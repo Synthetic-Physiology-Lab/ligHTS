@@ -21,11 +21,11 @@ Contains an environment and a Python pipeline optimized to extract cell area usi
 
 ## \- [groove\_analyzer](groove_analyzer)
 
-Contains an environment and a Python pipeline optimized to extract height and surface geometry parameters (period and depth) from confocal z-stacks of anisotropic hydrogels coated with fluorescent fiducial markers
+Contains an environment and a Python pipeline optimized to extract height and surface geometry parameters (period and depth) from confocal z-stacks of anisotropic hydrogels coated with fluorescent fiducial markers.
 
 ## \- [cell\_migration](cell_migration)
 
-Contains an environment and a Python pipeline optimized to segment and track via CellPose and LapTrack timeseries of migrating cells, and extract parameters to quantify their migration speed and directionality
+Contains an environment and a Python pipeline optimized to segment and track via CellPose and LapTrack timeseries of migrating cells, and extract parameters to quantify their morphology, migration speed, and directionality.
 
 ## \- [holographic\_reconstruction](holographic_reconstruction)
 

@@ -10,10 +10,11 @@ It is divided in two sub-routines:
 [Cellpose](https://github.com/MouseLand/cellpose) for segmentation and
 [LapTrack](https://github.com/yfukai/laptrack) for linking detections across
 frames. The workflow outputs compressed label stacks, a CSV with tracking
-metadata and an annotated video overlaying contours and track tails. Currently runs on CPU-only, if a GPU is available remove the no mkl requirement from the environment and update Cellpose model to GPU=True
+metadata and an annotated video overlaying contours and track tails. Currently runs on CPU-only, if a GPU is available, download the matching torch-cuda packages and update Cellpose model to GPU=True
  - [migration_analysis.py](migration_analysis.py) takes as input one or more folders containing CSV files with tracking
 metadata, and performs migration quantification, directionality (nematic order) analysis, and velocity computation, producing both numerical datasets and figures
 
+Two supplementary sub-routines are reported to extend the extracted parameters and to perform a cell-cycle analysis as reported in the supplementary perturbation assay.
 
 ## Install
 
@@ -102,6 +103,60 @@ Global metrics across all folders:
 - 'Combined_Summary_WNO.png' - Plot comparing directionality parameter per condition across all experiments
 - 'Combined_Summary_MeanVel.png' - Plot comparing migration velocity per condition across all experiments
 - 'migration_analysis_combined_provenance.json' - provenance record for the combined cross-folder run (SHA-256 of the script, git commit, interpreter/platform, parameters)
+
+## Optional add-on modules
+
+Two optional scripts run after `segment_track_stack.py` and extract extra
+parameters straight from its saved outputs. They read the `{stem}_cellpose_labels.tif`
+label stacks (and, for FUCCI, the original stacks left in the folder), joining
+objects to tracks through the `(frame, label)` key that the label stack and
+`{stem}_tracking.csv` already share.
+
+### extract_shape_metrics.py — morphology + extended migration metrics
+
+Measures per-object area, perimeter, eccentricity, orientation and axis lengths
+from the saved label masks, derives `aspect_ratio = major/minor` and a
+morphological `polarization_index = 1 − minor/major`, converts to physical units
+and computes displacement/velocity/nematic metrics.
+
+```bash
+python extract_shape_metrics.py
+    --input-dir /path/to/segment_track_stack/outputs   # GUI picker if omitted
+    --output-dir /path/to/results                       # GUI picker if omitted
+    --um-per-px 1.34            # micron-per-pixel scale
+    --frame-interval-min 15     # minutes between frames
+    --min-track-frames 8        # minimum frames to retain a track
+    --reference-axis-deg 90     # axis for the signed nematic order
+    --max-allowed-gap 2         # largest tolerated frame gap in a track
+    --group-regex "_(CNTRL)_"   # optional: one capture group -> experimental group
+```
+
+Outputs (in `--output-dir`): `frame_cell_metrics.csv`, `track_metrics.csv`,
+`replicate_summary.csv`, `exclusion_ledger.csv`, `sensitivity_analysis.csv`, a
+provenance JSON, and an `enriched_tracking/` folder of `{stem}_tracking.csv`
+files.
+
+### count_fucci_phases_from_labels.py — FUCCI cell-cycle phase fractions
+
+Reuses the saved cell masks and re-reads the original
+stack only to sample the two FUCCI nuclear reporters (defaults C0 = S/G2/M,
+C3 = G1). Each cell is assigned to its dominant
+reporter at the first/middle/last frame (or every frame).
+
+```bash
+python count_fucci_phases_from_labels.py
+    --input-dir /path/to/segment_track_stack/outputs   # GUI picker if omitted
+    --output-dir /path/to/results                       # GUI picker if omitted
+    --c0-channel 0             # channel scored as S/G2/M
+    --g1-channel 3             # channel scored as G1
+    --min-nuclear-intensity 0 # both-channel floor; below it a cell is unclassified
+    --all-frames              # score every frame instead of first/middle/last
+    --group-regex "_(CNTRL)_" # optional: one capture group -> experimental group
+```
+
+Outputs (in `--output-dir`): `fucci_phase_per_replicate.csv`,
+`fucci_phase_fractions.csv` (group × timepoint mean ± SEM),
+`fucci_phase_fractions.png`, and a provenance JSON.
 
 ## Migration metric definitions and QC (migration_analysis.py)
 
