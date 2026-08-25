@@ -39,5 +39,5 @@ Contains an environment and a Python script to generate the diffraction patterns
 
 ## \- [nanoindentation\_analyzer](nanoindentation_analyzer)
 
-Contains an environment and a Python suite to extract apparent reduced indentation moduli from Optics11 Chiaro spherical nanoindentation of GelMA hydrogels, producing per-gel and per-condition summaries, statistics, and figures.
+Contains an environment and a Python pipeline to extract the contact modulus E\* of GelMA hydrogels from Optics11 Chiaro spherical nanoindentation, with per-curve mechanical quality control, a validation against synthetic ground truth, and gel-level statistics and figures.
 

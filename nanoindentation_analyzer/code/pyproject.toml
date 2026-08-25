@@ -1,0 +1,24 @@
+# Formatting and lint configuration.
+#
+# Line length is 79 to match the documented style check,
+#     python -m pycodestyle --max-line-length 79 --ignore E203,W503 .
+# E203 and W503 are the two documented conflicts between black and
+# pycodestyle's reading of PEP 8; PEP 8 sides with black on both.
+
+[tool.black]
+line-length = 79
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 79
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM", "RUF"]
+ignore = ["E203"]
+
+[tool.ruff.lint.per-file-ignores]
+# Scripts import from `_common/` after extending sys.path, so the imports
+# cannot come first. The offending lines carry `# nopep8` for pycodestyle.
+"scripts/*.py" = ["E402"]
+"verify.py" = ["E402"]

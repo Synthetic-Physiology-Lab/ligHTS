@@ -1,24 +1,27 @@
-# GelMA nanoindentation analysis
+# Contact modulus of GelMA hydrogels by instrumented nanoindentation
 
-Analysis suite for Optics11 Chiaro spherical nanoindentation of GelMA hydrogels. Feeded a
-single characterisation session (all gels measured together, e.g. 12 gels = 4 replicates × 3
-concentrations, each gel a sub-folder of raw `.txt` force curves) it extracts an apparent
-reduced indentation modulus per curve, aggregates by gel and by concentration, and produces the
-statistics and figures.
+Raw curves, analysis code, a validation against known ground truth, and the
+results, for 1058 indentations on 32 photopolymerised GelMA gels across three
+campaigns.
 
-## Method
+## Repository layout
 
-The script extracts apparent reduced indentation modulus from a soft-matter Hertz sphere model:
+This folder ships the software only; it contains no data files. The dataset
+(raw curves, synthetic set, results and validation) is archived separately on
+Zenodo, [10.5281/zenodo.21840233](https://doi.org/10.5281/zenodo.21840233).
+Download and unpack it, then point the code at it: every script resolves its
+paths from one `ROOT` constant, which defaults to `../data` and is overridden
+by the `LIGHTS_DATA` environment variable.
 
-- Depth axis ζ = piezo − cantilever, which removes cantilever compliance.
-- Robust pre-contact baseline (line + MAD scatter), subtracted.
-- Objective contact point that maximises R² over a fixed 0–4 µm window (coarse 40 nm scan, refined
-  to 5 nm).
-- Zero-intercept Hertz sphere `F = (4/3) E_app √R δ^1.5` fitted over 0–4 µm; the slope gives
-  `E_app`, the reported apparent reduced modulus.
-- Late-window (1.5–4 µm) self-consistency diagnostic.
-- Pre-registered QC gates and a within-gel outlier screen (modified z-score on log10 E).
-- Each gel represents the experimental unit: the gel median feeds the per-condition summary and statistics.
+```
+code/     pyproject.toml, setup.cfg, _common/, scripts/, verify.py
+```
+
+```bash
+# example: run against the unpacked archive wherever it lives
+export LIGHTS_DATA=/path/to/data
+python code/scripts/03_analyse.py
+```
 
 ## Install
 
@@ -31,50 +34,39 @@ pip install -r requirements.txt
 Using Conda:
 ```bash
 conda env create -f environment.yml
-conda activate gelma-indentation
+conda activate lights-indentation
 ```
 
-## Basic usage
+## Run
 
-Run the script and pick the session folder from the GUI:
 ```bash
-python gelma_indentation_suite.py
+python code/scripts/01_synthesise.py    # the synthetic set + its truth table
+python code/scripts/02_validate.py      # recover that truth
+python code/scripts/03_analyse.py       # QC + pipeline over real datasets, defaults to `raw/` folder in `data/`
+python code/scripts/04_statistics.py    # gel-level statistics
+python code/verify.py                   # six gates for control
 ```
 
-## Advanced Options
+The chain takes about four minutes end to end, of which `03_analyse.py` is two.
+`python code/verify.py --full` re-runs the chain and then the gates.
 
-Run headless by passing the session folder and an output folder:
-```bash
-python gelma_indentation_suite.py --raw <session_folder> --out <output_folder>
-```
+## What is measured
 
-## Input requirements
+Contact modulus *E\**, over 0.5-3.5 um of indentation, at 5 um s⁻¹, with a
+spherical probe of radius 25-27.5 um, in 1x PBS at pH 7.4 and room temperature.
+The window and the rate are part of the quantity: the apparent modulus of these
+gels rises with indentation depth.
 
-- One session folder with one sub-folder per gel.
-- Gel sub-folders named `GelMA_<conc>mgmL_gel<n>[_...]`, with concentration in mg/mL. Percent-w/v
-  labels (7.5 / 10 / 15) and the raw `matrix_scan.._<pct>_<rep>` instrument names are also recognised.
-- Curve files keep the instrument name `<label> S-1 X-<col> Y-<row> I-01.txt`.
+Three measurements of that depth dependence, none of which takes a contact
+point as given, are in `data/results/statistics.csv` and per curve in
+`data/results/per_curve.csv`:
 
-## Outputs
+| | |
+|---|---|
+| pointwise modulus (d*F*/d*s*)/(2√(*Rδ*)), per-curve ratio at 4.00 um to 0.75 um | x1.36, x1.66, x1.49 for the three campaigns, on the 155 / 196 / 173 curves reaching both bins |
+| window ladder: linearised Hertz refitted over [lo, 1] x peak force, contact point a free intercept | x0.66 at lo = 0.02 rising monotonically to x1.20 at lo = 0.70, relative to lo = 0.30, with no plateau |
+| curvature of (d*F*/d*s*)² against raw displacement, a straight line for a homogeneous half-space | deep-half slope x2.83 the shallow-half slope; 90.9 % of curves exceed 1 |
 
-### Per gel (one sub-folder per matrix scan)
-- `per_curve_metrics.csv` — instrument-extracted and recalculated values per curve, with per-QC-gate
-  pass/fail, thresholds, and an outlier flag
-- `<sample_id>_curve_fits.eps` / `.jpg` — every force curve with its contact point and Hertz fit
-- `<sample_id>_spatial_maps.eps` / `.jpg` — X–Y grid maps of apparent modulus, contact point, and
-  QC / FOV technical success
-- `matrix_report.txt`
 
-### Per session (top-level folder)
-- `master_per_curve.csv` — every curve of the session, one row each
-- `per_matrix_summary.csv` — one row per gel
-- `per_condition_summary.csv` — one row per concentration
-- `statistics.csv` — ANOVA and pairwise tests (Welch/Holm, exact permutation, Hedges g)
-- `superplot.eps` / `.jpg` — per-curve, gel-median and condition-mean figure
-- `modulus_map_atlas.eps` / `.jpg` — every gel's modulus map, tiled by condition
-- `contactpoint_map_atlas.eps` / `.jpg` — every gel's contact-point map
-- `sensitivity_analysis.eps` / `.jpg` and `sensitivity_analysis.csv` — stability of the result to the
-  contact rule, fit window and processing choices
-- `session_report.txt`
 
 
