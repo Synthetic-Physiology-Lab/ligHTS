@@ -189,7 +189,7 @@ def create_nematic_order_plot(df, um_per_pix, min_frame, output_path):
         / (disp_t * nframe).sum()
     )
     disp_t_um = disp_t * um_per_pix
-    meanvel_per_track = disp_t_um / ((nframe-1) * min_frame)
+    meanvel_per_track = disp_t_um / (nframe * min_frame)
     meanvel_fov = meanvel_per_track.mean()
     meanvel_sd_fov = meanvel_per_track.std()
     track_id = list(range(1, len(meanvel_per_track) + 1))

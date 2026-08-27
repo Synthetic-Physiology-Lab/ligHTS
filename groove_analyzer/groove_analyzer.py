@@ -848,7 +848,7 @@ def measure_gel_height(
                 continue
             seg_safe = np.where(np.isfinite(seg), seg, np.inf)
             x_val = lo + int(np.argmin(seg_safe))
-            z_val = row[x_val] if np.isfinite(row[x_val]) else row_s[x_val]
+            z_val = row[x_val]
             if np.isfinite(z_val):
                 valley_heights.append(float(z_val))
 
@@ -1095,10 +1095,25 @@ def analyze_file(
     pitch_px = float(fft_pitch_um) / float(xy_um)
 
     if abs(float(fft_angle_deg)) > 0.5:
-        h_aligned = rotate_to_align(h_in, fft_angle_deg)
-        h_slope_aligned = rotate_to_align(h_slope_in, fft_angle_deg)
+        # Fold a rotation beyond 45 deg into a <=45 deg rotation plus a transpose
+        # (a quarter turn is lossless), so the inscribed-rectangle crop never
+        # collapses to a degenerate 1x1 for grooves far from vertical.
+        rot_angle = float(fft_angle_deg)
+        swap_axes = False
+        if rot_angle > 45.0:
+            rot_angle -= 90.0
+            swap_axes = True
+        elif rot_angle < -45.0:
+            rot_angle += 90.0
+            swap_axes = True
 
-        rh, rw = max_inscribed_rect(h_aligned.shape, fft_angle_deg)
+        h_aligned = rotate_to_align(h_in, rot_angle)
+        h_slope_aligned = rotate_to_align(h_slope_in, rot_angle)
+        if swap_axes:
+            h_aligned = h_aligned.T
+            h_slope_aligned = h_slope_aligned.T
+
+        rh, rw = max_inscribed_rect(h_aligned.shape, rot_angle)
         h0, w0 = h_aligned.shape
         r0, c0 = (h0 - rh) // 2, (w0 - rw) // 2
 
@@ -1171,6 +1186,11 @@ def analyze_file(
         "z0_um_offset": float(z0_um),
         "analysis_summary": analysis_info,
     }
+
+    if not (
+        math.isfinite(pitch_result.value) or math.isfinite(depth_result.value)
+    ):
+        results["error"] = "No measurable grooves after alignment and cropping"
 
     summary_path = outdir / f"{stem}_analysis_summary.txt"
     with summary_path.open("w", encoding="utf-8") as f:

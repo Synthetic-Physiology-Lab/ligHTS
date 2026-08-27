@@ -332,14 +332,13 @@ def _verify_one(
     sample: SyntheticSample,
     cfg: ValidationConfig,
     output_root: Path,
-    api_version: str,
 ) -> VerificationResult:
     # Verify one sample against ground truth
 
     per_out = output_root / sample.file_name.replace(".tif", "")
     per_out.mkdir(parents=True, exist_ok=True)
 
-    res, err = _analyze_one(mod, sample, outdir=per_out, api_version=api_version)
+    res, err = _analyze_one(mod, sample, outdir=per_out)
 
     # Ground truth angle is always 0 for synthetic holographic data (vertical grooves)
     angle_truth = 0.0
@@ -652,7 +651,7 @@ def run_validation(
     if not samples:
         raise RuntimeError("truth_index.csv contained 0 samples.")
 
-    mod, label, api_version = _load_analyzer_module(analyzer_path)
+    mod, label = _load_analyzer_module(analyzer_path)
 
     cfg = ValidationConfig()
 
@@ -664,7 +663,7 @@ def run_validation(
 
     results: List[VerificationResult] = []
     for i, s in enumerate(samples, 1):
-        results.append(_verify_one(mod, s, cfg, out_root, api_version))
+        results.append(_verify_one(mod, s, cfg, out_root))
         if i % 10 == 0 or i == len(samples):
             n_pass = sum(1 for x in results if x.passed)
             LOG.info("Verified %d/%d samples (%d passed)", i, len(samples), n_pass)

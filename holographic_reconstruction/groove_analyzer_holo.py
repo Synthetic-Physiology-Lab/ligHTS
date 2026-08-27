@@ -193,6 +193,8 @@ def load_height_map(path: Path) -> Tuple[np.ndarray, Dict[str, Any]]:
         return np.asarray(arr), {**meta, "combine_mode": "2d"}
     if arr.ndim == 3:
         med = np.nanmedian(arr, axis=0)
+        if np.issubdtype(arr.dtype, np.integer):
+            med = np.rint(med).astype(arr.dtype)
         return np.asarray(med), {**meta, "combine_mode": "median_z"}
     raise ValueError(f"Expected 2D or 3D TIFF, got shape {arr.shape}")
 
@@ -751,8 +753,13 @@ def write_csv(path: Path, rows: List[Dict[str, Any]]) -> None:
     """Write a list of dict rows to CSV at `path` (no-op if rows is empty)."""
     if not rows:
         return
+    fieldnames: List[str] = []
+    for r in rows:
+        for k in r:
+            if k not in fieldnames:
+                fieldnames.append(k)
     with path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        w = csv.DictWriter(f, fieldnames=fieldnames, restval="")
         w.writeheader()
         w.writerows(rows)
 
