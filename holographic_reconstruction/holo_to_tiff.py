@@ -427,8 +427,13 @@ def estimate_pitch_um_from_vertical(
     Y = np.fft.rfft(prof * np.hanning(n))
     mag = np.abs(Y)
     freqs = np.fft.rfftfreq(n, d=1.0)
-    lo = max(1, int(0.001 * n))
-    k = lo + int(np.argmax(mag[lo:]))
+    # Restrict the search to the physically possible pitch band so a residual
+    # low-order background cannot win the argmax and be read as a huge pitch.
+    k_hi = max(2, int(np.floor(n * px_um / 15.0)))   # pitch >= 15 um
+    k_lo = max(1, int(np.ceil(n * px_um / 120.0)))   # pitch <= 120 um
+    if k_lo >= k_hi:
+        return float("nan")
+    k = k_lo + int(np.argmax(mag[k_lo:k_hi]))
     f = float(freqs[k])
     if f <= 0:
         return float("nan")
@@ -501,11 +506,16 @@ def process_fov(
     fused_img = Image.fromarray(fused_u8)
 
     os.makedirs(out_dir, exist_ok=True)
-    label = (
-        min(NEAREST_SET, key=lambda x: abs(x - pitch_um))
-        if np.isfinite(pitch_um)
-        else -1
-    )
+    label = -1
+    if np.isfinite(pitch_um):
+        nearest = min(NEAREST_SET, key=lambda x: abs(x - pitch_um))
+        if abs(nearest - pitch_um) <= 0.15 * nearest:
+            label = nearest
+        else:
+            logging.warning(
+                "FOV %s: pitch %.3f um matches no label in %s",
+                fov, pitch_um, NEAREST_SET,
+            )
     out_name = f"{fov}_{label}.tif" if label != -1 else f"{fov}_NA.tif"
     out_path = os.path.join(out_dir, out_name)
     desc_out = build_description(

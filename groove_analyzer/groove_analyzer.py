@@ -781,7 +781,12 @@ def measure_depth_per_groove(
         arr = np.asarray(row_depth_values, dtype=float) * bias_mult_factor
         mean_fov = np.nanmean(arr)
         std_fov = np.nanstd(arr)
-        # std_fov = float(np.sqrt(np.nanmean((arr - mean_depth) ** 2)))
+        # The reported value is mean_fov (the row pool); derive u_a, u_b and n
+        # from that same sample rather than from the stripe-averaged profile.
+        n = int(np.isfinite(arr).sum())
+        u_a = float(np.nanstd(arr, ddof=1) / math.sqrt(n)) if n > 1 else float("nan")
+        u_b_cal = float(config.u_rel_calibration) * float(mean_fov)
+        u_b = math.hypot(u_b_res, u_b_cal)
         if config.generate_plots:
             plot_histogram(
                 arr,
@@ -872,8 +877,10 @@ def measure_gel_height(
         return MeasurementResult(float("nan"))
 
     median_height = float(np.median(clean))
-    n = int(clean.size)
-    std = float(np.std(clean, ddof=1)) if n > 1 else float("nan")
+    std = float(np.std(clean, ddof=1)) if clean.size > 1 else float("nan")
+    # Rows one pixel apart sample the same valley and are not independent; the
+    # effective replicate count is the number of grooves, not the pixel count.
+    n = int(valleys.size)
     if n > 1:
         mad = float(np.median(np.abs(clean - median_height)))
         u_a = 1.2533 * 1.4826 * mad / math.sqrt(n) #correction for median-based MAD

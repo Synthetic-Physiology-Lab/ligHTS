@@ -220,7 +220,7 @@ def groove_wavevector(
     """
     valid = np.isfinite(field_2d)
     if valid.sum() < 16:
-        return pitch_um, 0.0
+        return float("nan"), 0.0
     centred = np.where(valid, field_2d - np.nanmean(field_2d), 0.0)
     rows, columns = np.mgrid[0 : field_2d.shape[0], 0 : field_2d.shape[1]]
     x_um = columns[valid] * step_um
@@ -245,7 +245,7 @@ def groove_wavevector(
     nominal = 1.0 / pitch_um
     band = (radius > 0.4 * nominal) & (radius < 2.0 * nominal)
     if not band.any():
-        return pitch_um, 0.0
+        return float("nan"), 0.0
     peak = np.unravel_index(np.argmax(np.where(band, spectrum, 0.0)), spectrum.shape)
     best = (float(mesh_x[peak]), float(mesh_y[peak]))
 
@@ -270,7 +270,7 @@ def groove_wavevector(
     )
     kx, ky = refined.x if refined.success else np.asarray(best)
     if not np.hypot(kx, ky):
-        return pitch_um, 0.0
+        return float("nan"), 0.0
     # Lines of constant phase satisfy kx*x + ky*y = const, so the groove runs
     # along dx/dy = -ky/kx: the tilt is the negative of the wavevector angle.
     # A real field also has conjugate spectral peaks, so k and -k are equivalent
@@ -363,7 +363,11 @@ def analyse_surface(
     the quantity being measured.
     """
     spectral_pitch, angle = groove_wavevector(field_2d, step_um, pitch_um)
-    if np.isfinite(spectral_pitch) and 0.5 * pitch_um < spectral_pitch < 2.0 * pitch_um:
+    accepted = bool(
+        np.isfinite(spectral_pitch)
+        and 0.5 * pitch_um < spectral_pitch < 2.0 * pitch_um
+    )
+    if accepted:
         pitch_um = spectral_pitch
     period_px = pitch_um / step_um
     naive = np.nanmedian(field_2d, axis=0)
@@ -411,7 +415,7 @@ def analyse_surface(
     # depth is not biased low by the coarse sampling of the grid.
     upsample = max(math.ceil(8.0 / period_px), 1)
     depths = period_depths(fourier_upsample(profile, upsample), period_px * upsample)
-    measured_pitch = spectral_pitch
+    measured_pitch = spectral_pitch if accepted else float("nan")
     return GrooveMetrology(
         depth_mean_um=float(np.mean(depths)) if depths.size else float("nan"),
         depth_sd_um=float(np.std(depths, ddof=1)) if depths.size > 1 else float("nan"),

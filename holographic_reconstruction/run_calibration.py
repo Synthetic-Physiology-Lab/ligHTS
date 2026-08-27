@@ -43,7 +43,14 @@ def main() -> int:
 
     recap = pd.read_csv(base / "conf_out" / "groove_recap.csv")
     confocal_depths = recap.depth_um.to_numpy(float)
-    print(f"confocal depths (bias-corrected by the pipeline): {confocal_depths}")
+    if "depth_bias_corr_factor" in recap.columns:
+        depth_bias = recap.depth_bias_corr_factor.to_numpy(float)
+    else:
+        depth_bias = np.ones_like(confocal_depths)
+    print(
+        "confocal depths (bias-corrected by groove_analyzer.py, factors "
+        f"{depth_bias}): {confocal_depths}"
+    )
 
     records = []
     for folder in sorted((base / "HPI" / "HPI").iterdir()):
@@ -74,6 +81,8 @@ def main() -> int:
         "d_nano_um": calibration.depth_nano_um,
         "d_nano_sd_um": calibration.depth_nano_sd_um,
         "d_confocal_um": calibration.depth_confocal_um,
+        "confocal_depth_bias_factors": depth_bias.tolist(),
+        "confocal_depths_uncorrected_um": (confocal_depths / depth_bias).tolist(),
         "opd_nm": calibration.optical_path_nm,
         "zeta": calibration.zeta,
         "zeta_ci": list(calibration.zeta_ci),
