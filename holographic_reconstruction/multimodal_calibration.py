@@ -648,11 +648,17 @@ def calibrate(
 ) -> Calibration:
     """Derive both conversion constants against the mechanical reference."""
     zeta, zeta_ci = bootstrap_ratio(
-        nano.depth_mean_um, nano.depth_sd_um, confocal_depths_um
+        nano.depth_mean_um,
+        nano.depth_sd_um / math.sqrt(max(nano.n_periods, 1)),
+        confocal_depths_um,
     )
     # delta_n = OPD / thickness, with OPD in micrometres.
     rng = np.random.default_rng(20260716)
-    reference = rng.normal(nano.depth_mean_um, nano.depth_sd_um, 20000)
+    reference = rng.normal(
+        nano.depth_mean_um,
+        nano.depth_sd_um / math.sqrt(max(nano.n_periods, 1)),
+        20000,
+    )
     resampled = rng.choice(
         optical_path_nm, (20000, optical_path_nm.size), replace=True
     ).mean(axis=1)

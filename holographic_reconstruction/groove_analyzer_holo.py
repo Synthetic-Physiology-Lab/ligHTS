@@ -37,9 +37,9 @@ except ImportError:
     simpledialog = None
 
 try:
-    matplotlib.use("Agg", force=True)
+    mpl.use("Agg", force=True)
     import matplotlib.pyplot as plt
-except Exception:
+except ImportError:
     plt = None
 
 
@@ -646,7 +646,16 @@ def measure_depth_per_groove(
                 if np.isfinite(v):
                     w.writerow([float(v)])
 
-    return MeasurementResult(mean_fov, u_a=u_a, u_b=u_b, n=int(clean.size), rmse=sd_fov)
+    if row_depth_values:
+        # The reported value is mean_fov, the mean of the row pool `arr`; derive
+        # u_a, u_b and n from that same sample rather than from the averaged profile.
+        u_a = float(np.nanstd(arr, ddof=1) / math.sqrt(arr.size))
+        u_b_cal = float(config.u_rel_calibration * mean_fov)
+        u_b = float(math.sqrt(u_b_res**2 + u_b_cal**2))
+        n_out = int(arr.size)
+    else:
+        n_out = int(clean.size)
+    return MeasurementResult(mean_fov, u_a=u_a, u_b=u_b, n=n_out, rmse=sd_fov)
 
 
 def plot_height_map(h: np.ndarray, xy_um: float, outpath: Path, title: str) -> None:
@@ -810,7 +819,7 @@ def analyze_file(
         np.isfinite(fft_angle_deg)
         and abs(fft_angle_deg) > config.rotate_if_abs_angle_deg_gt
     ):
-        h_aligned = rotate_and_crop(h_detr, float(fft_angle_deg))
+        h_aligned = rotate_and_crop(h_aligned, float(fft_angle_deg))
         rotation_applied = float(fft_angle_deg)
 
     pitch_res = measure_pitch_per_groove(

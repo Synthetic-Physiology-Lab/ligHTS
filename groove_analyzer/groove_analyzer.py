@@ -793,6 +793,7 @@ def measure_depth_per_groove(
             )
 
     else:
+        mean_fov = mean_depth
         std_fov = float("nan")
 
 

@@ -28,7 +28,7 @@ Workflow
 Optional calibration against nanoindentation and confocal images
 -------------------
 1) create in the same folder of the code a subfolder called tiff containing the tiff version of confocal calibration data
-2) create in the same folder of the code a subfolder named conf_out containinf grooves_recap.csv as created via groove_analyzer.py
+2) create in the same folder of the code a subfolder named conf_out containing groove_recap.csv as created via groove_analyzer.py
 3) create in the same folder of the code two nested folders HPI/HPI containing the raw holographic microscopy data
 4) create in the same folder of the code a folder named NanoindentationChiaro containing raw nanoindentation data
 5) run run_calibration.py
