@@ -380,6 +380,10 @@ def analyze_one(
             "Analyzer module does not expose analyze_tiff(...) or analyze_file(...).",
         )
 
+    # STRICT: an analyzer that returned an in-band error dict is an error, not a
+    # silent threshold failure. [GROOVE_C-04]
+    if isinstance(res, dict) and res.get("error"):
+        return res, str(res["error"])
     res["pitch_meas_um"] = float(res.get("pitch_mean_um", res.get("pitch_um", np.nan)))
     res["depth_meas_um"] = float(res.get("depth_mean_um", res.get("depth_um", np.nan)))
     res["angle_meas_deg"] = float(res.get("fft_angle_deg", np.nan))
@@ -544,6 +548,9 @@ def verify_one(
         else float("nan")
     )
 
+    # Absolute-tolerance fallback kept: it reflects the instrument sensitivity
+    # floor (2 px for pitch, 2 dz for depth), below which a percentage error is
+    # not meaningful. A sample passes on MAPE OR on being within that floor.
     pitch_abs_tol_um = 2.0 * imaging.xy_um
     depth_abs_tol_um = 2.0 * imaging.dz_um
 
@@ -567,17 +574,15 @@ def verify_one(
         or (np.isfinite(gel_abs_err) and height_mape <= cfg.height_mape_thresh_pct)
     )
 
+    # STRICT: an unavailable RMSE is not a pass. [GROOVE_C-03]
     height_available = np.isfinite(height_rmse)
-    height_pass = bool(
-        (not height_available) or (height_rmse <= cfg.height_rmse_thresh_um)
-    )
+    height_pass = bool(height_available and height_rmse <= cfg.height_rmse_thresh_um)
 
-    if "recon_valid_frac" in res:
-        recon_valid_pass = bool(
-            np.isfinite(recon_valid_frac) and recon_valid_frac > 0.0
-        )
-    else:
-        recon_valid_pass = True
+    # STRICT: actually evaluate reconstruction validity against the 0.5 floor,
+    # reading the key the analyzer really emits. [GROOVE_C-01]
+    recon_prc = res.get("recon_valid_prc", np.nan)
+    recon_frac = float(recon_prc) / 100.0 if np.isfinite(float(recon_prc)) else float("nan")
+    recon_valid_pass = bool(np.isfinite(recon_frac) and recon_frac >= 0.5)
     passed = bool(
         pitch_pass
         and depth_pass
@@ -902,10 +907,16 @@ def main_cli(dataset_dir: str, analyzer_path: str, *, log_level: str) -> None:
     """CLI entry point: run validation with specified dataset and analyzer paths."""
     setup_logging(log_level)
     try:
-        run_validation(Path(dataset_dir), Path(analyzer_path))
+        _results, summary = run_validation(Path(dataset_dir), Path(analyzer_path))
     except Exception:
         LOG.exception("Validation failed")
         raise SystemExit(1)
+    # STRICT: a failed validation must be visible to the caller. [GROOVE_C-08]
+    if summary.get("failed") or summary.get("errors"):
+        raise SystemExit(
+            f"{summary.get('failed', 0)}/{summary.get('total_samples', 0)} failed, "
+            f"{summary.get('errors', 0)} analyzer errors"
+        )
 
 
 if __name__ == "__main__":

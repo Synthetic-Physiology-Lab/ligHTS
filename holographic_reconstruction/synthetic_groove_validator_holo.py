@@ -300,6 +300,9 @@ def _analyze_one(
         except Exception:
             res = dict(getattr(res_obj, "__dict__", {}))
 
+    # STRICT: an analyzer that returned an in-band error dict is an error. [HOLO_D-05]
+    if isinstance(res, dict) and res.get("error"):
+        return res, str(res["error"])
     # Extract measured values
     res["pitch_meas_um"] = float(res.get("pitch_um", np.nan))
     res["depth_meas_um"] = float(res.get("depth_um", np.nan))
@@ -380,7 +383,9 @@ def _verify_one(
         abs(depth_meas - sample.depth_um) if np.isfinite(depth_meas) else float("nan")
     )
 
-    # Tolerances: 2 px for pitch, 2 gray levels for depth
+    # Absolute-tolerance fallback kept: it reflects the instrument sensitivity
+    # floor (2 px for pitch, 2 gray levels for depth), below which a percentage
+    # error is not meaningful. A sample passes on MAPE OR on that floor.
     pitch_abs_tol_um = 2.0 * sample.xy_um_per_px
     depth_abs_tol_um = 2.0 * sample.dz_um_per_gray
 
@@ -717,10 +722,16 @@ def main_gui() -> None:
 def main_cli(dataset_dir: str, analyzer_path: str, *, log_level: str) -> None:
     _setup_logging(log_level)
     try:
-        run_validation(Path(dataset_dir), Path(analyzer_path))
+        _results, summary = run_validation(Path(dataset_dir), Path(analyzer_path))
     except Exception:
         LOG.exception("Validation failed")
         raise SystemExit(1)
+    # STRICT: a failed validation must be visible to the caller. [HOLO_D-06]
+    if summary.get("failed") or summary.get("errors"):
+        raise SystemExit(
+            f"{summary.get('failed', 0)}/{summary.get('total_samples', 0)} failed, "
+            f"{summary.get('errors', 0)} analyzer errors"
+        )
 
 
 if __name__ == "__main__":

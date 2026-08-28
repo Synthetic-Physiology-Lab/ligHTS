@@ -180,8 +180,14 @@ def write_validation_csv(output_path: Path, results: list[SampleResult]) -> None
         output_path.write_text("note\nno rows\n", encoding="utf-8")
         return
 
+    # STRICT: union of keys so a failed (short) row cannot abort the report. [FLATGEL_C-01]
+    fieldnames: list[str] = []
+    for row in rows:
+        for key in row:
+            if key not in fieldnames:
+                fieldnames.append(key)
     with open(output_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer = csv.DictWriter(f, fieldnames=fieldnames, restval="")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -974,7 +980,17 @@ def process_single_sample(
         )
 
     field_results = compare_fields(truth_row.row, measured, field_specs)
-    passed = all(fr.passed for fr in field_results if not fr.skipped)
+    # STRICT: a sample with no comparable truth field is not a pass. [FLATGEL_C-02]
+    compared = [fr for fr in field_results if not fr.skipped]
+    if not compared:
+        return SampleResult(
+            file=truth_row.file,
+            scenario=extract_scenario_from_row(truth_row.row),
+            passed=False,
+            error="no comparable truth fields (all skipped)",
+            fields=field_results,
+        )
+    passed = all(fr.passed for fr in compared)
 
     return SampleResult(
         file=truth_row.file,
@@ -1096,7 +1112,7 @@ def setup_logging(level: str) -> None:
     )
 
 
-def main() -> None:
+def main() -> int:
     """Parse arguments and run validation in CLI or GUI mode."""
     parser = argparse.ArgumentParser(
         description="Validate gel analyzer against synthetic data",
@@ -1138,6 +1154,7 @@ def main() -> None:
 
     if args.gui:
         run_gui_mode()
+        return 0
     else:
         if not args.analyzer_path or not args.dataset_dir:
             parser.error(
@@ -1155,7 +1172,9 @@ def main() -> None:
         )
 
         print_validation_summary(summary)
+        # STRICT: non-zero exit on any failure or error. [FLATGEL_C-03]
+        return 0 if (summary["failed"] == 0 and summary["errors"] == 0) else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
