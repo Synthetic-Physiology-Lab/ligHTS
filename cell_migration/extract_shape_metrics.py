@@ -13,15 +13,7 @@ segmentation/tracking step, this script:
 3. converts everything to physical units with ``--um-per-px`` and derives the
    per-step displacement / velocity / nematic metrics;
 4. writes, per replicate, an enriched tracking CSV into
-   ``<output-dir>/enriched_tracking/{stem}_tracking.csv`` whose columns match
-   exactly what ``migration_analysis_extended.py`` reads (and reuses the
-   ``_tracking.csv`` name its glob expects, in a separate folder so the base
-   tracking output is never overwritten); point that script at the folder with
-   ``migration_analysis_extended.py --tracking-dir <output-dir>/enriched_tracking``;
-5. additionally computes the same tidy metric levels that
-   ``migration_analysis_extended.py`` produces (frame / track / replicate tables,
-   an exclusion ledger and a min-track-length sensitivity sweep), so the public
-   repository has a self-contained end-to-end path.
+   ``<output-dir>/enriched_tracking/{stem}_tracking.csv`` 
 
 Shape-descriptor definitions
 ----------------------------
@@ -562,7 +554,7 @@ def main() -> int:
                 "reference_axis_deg": REFERENCE_AXIS_DEG,
                 "max_allowed_gap": MAX_ALLOWED_GAP,
                 "group_regex": args.group_regex,
-                "polarization_index": "(major-minor)/(major+minor)",
+                "polarization_index": "1 - minor_axis/major_axis",
                 "n_stacks": len(pairs),
             },
             script_path=__file__,
