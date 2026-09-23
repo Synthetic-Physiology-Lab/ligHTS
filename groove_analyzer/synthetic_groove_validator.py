@@ -707,10 +707,22 @@ def write_report(
         f.write("| Metric | Threshold |\n|---|---:|\n")
         f.write(f"| Pitch MAPE | ≤ {th['pitch_mape_thresh_pct']}% |\n")
         f.write(f"| Depth MAPE | ≤ {th['depth_mape_thresh_pct']}% |\n")
+        f.write(
+            f"| Pitch |abs err| (fallback) | ≤ "
+            f"{th['pitch_abs_err_thresh_um']:.2f} µm (2 px) |\n"
+        )
+        f.write(
+            f"| Depth |abs err| (fallback) | ≤ "
+            f"{th['depth_abs_err_thresh_um']:.2f} µm (2 dz) |\n"
+        )
         f.write(f"| Angle error | ≤ {th['angle_err_thresh_deg']}° |\n")
         f.write(f"| Gel height |abs err| | ≤ {th['gel_height_abs_tol_um']} µm |\n")
         f.write(f"| Height MAPE | ≤ {th['height_mape_thresh_pct']}% |\n")
         f.write(f"| Height RMSE | ≤ {th['height_rmse_thresh_um']} µm |\n\n")
+        f.write(
+            "A sample passes on pitch and on depth when the error is within the MAPE "
+            "limit **or** within the absolute fallback, whichever is looser.\n\n"
+        )
 
         f.write("## Failed Samples (first 25)\n\n")
         if not failed:

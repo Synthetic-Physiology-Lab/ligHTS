@@ -20,12 +20,21 @@ This code **does not** model or validate:
 ## Repository contents
 - `uv_mask_profile_divergence.py` — main script (GUI output-folder picker when available).
 - `MODEL_AND_OUTPUTS.md` — model overview, parameters to change, and output schema.
+- `requirements.txt` / `environment.yml` — pinned dependencies.
 
 ## Installation
-Tested with Python 3.9+ in a clean virtual environment.
+Tested with Python 3.11 in a clean virtual environment. The pinned `numpy` and
+`matplotlib` versions provide wheels for Python 3.9-3.12.
 
+Using pip:
 ```bash
 pip install -r requirements.txt
+```
+
+Using Conda:
+```bash
+conda env create -f environment.yml
+conda activate uv-mask-diffraction
 ```
 
 ## Run

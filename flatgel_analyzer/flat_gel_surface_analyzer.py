@@ -235,6 +235,30 @@ def read_tiff(path: str) -> np.ndarray:
         raise RuntimeError(f"Failed to read TIFF: {path}")
     if axes and isinstance(axes, str) and len(axes) == arr.ndim:
         axes_u = axes.upper()
+        # A plain multi-page TIFF carries no Z axis: tifffile labels the page
+        # axis 'I', or 'Q' when it cannot name it. Treat a single such axis as Z,
+        # otherwise the page index would be selected like any other non-spatial
+        # axis and the stack would collapse to one slice.
+        if "Z" not in axes_u:
+            generic = [i for i, ax in enumerate(axes_u) if ax in ("I", "Q")]
+            if len(generic) == 1:
+                i_gen = generic[0]
+                logging.info(
+                    "TIFF '%s' has axes '%s' and no Z axis; treating page axis "
+                    "'%s' (n=%d) as Z.",
+                    os.path.basename(path),
+                    axes,
+                    axes_u[i_gen],
+                    int(arr.shape[i_gen]),
+                )
+                axes_u = axes_u[:i_gen] + "Z" + axes_u[i_gen + 1 :]
+            elif len(generic) > 1:
+                raise RuntimeError(
+                    f"TIFF '{os.path.basename(path)}' has axes '{axes}' with more "
+                    "than one generic page axis and no Z axis; cannot tell which "
+                    "one is Z. Export OME-TIFF with explicit axes, or convert to a "
+                    "ZYX TIFF/ND2."
+                )
         slicer = []
         kept_axes: list[str] = []
         for i_ax, ax in enumerate(axes_u):
@@ -329,7 +353,11 @@ def read_stack(path: str) -> np.ndarray:
 
 
 def infer_voxel_sizes_from_file(path: str) -> tuple[float | None, float | None]:
-    """Infer (xy_um_per_px, z_step_um) from image metadata when available. Returns (None, None) if metadata is missing or unreadable."""
+    """Infer (xy_um_per_px, z_step_um) from image metadata when available.
+
+    Tries OME-TIFF metadata, then ``nd2`` for .nd2 files, then aicsimageio.
+    Returns (None, None) if metadata is missing or unreadable.
+    """
 
     try:
         with tifffile.TiffFile(path) as tfh:
@@ -343,6 +371,16 @@ def infer_voxel_sizes_from_file(path: str) -> tuple[float | None, float | None]:
                 return get_float_attr(px, "PhysicalSizeX"), get_float_attr(px, "PhysicalSizeZ")
     except Exception:
         pass
+    if ND2_AVAILABLE and os.path.splitext(path)[1].lower() == ".nd2":
+        try:
+            with nd2.ND2File(path) as f:
+                vs = f.voxel_size()
+                sx = float(vs.x) if vs.x else None
+                sz = float(vs.z) if vs.z else None
+            if sx or sz:
+                return sx, sz
+        except Exception:
+            pass
     try:
         if AICS_AVAILABLE:
             img = AICSImage(path)
@@ -1177,7 +1215,11 @@ def process_stack(
     stack = read_stack(path)
     z, h, w = stack.shape
     if z < 3:
-        raise ValueError(f"Stack '{os.path.basename(path)}' has z={z} < 3 slices; need >=3.")
+        raise ValueError(
+            f"Stack '{os.path.basename(path)}' has z={z} < 3 slices; need >=3. "
+            "If this is a multi-page TIFF, check that its axis metadata names the "
+            "page axis (Z, I or Q) rather than a channel or time axis."
+        )
 
     well_mask_u8, well_contour_px = segment_well_from_stack(stack, xy_um_per_px)
     file_name = os.path.basename(path)

@@ -52,8 +52,8 @@ PAIRS = (
 )
 
 GROUP_LABELS = {
-    "batch": ("Batch:", "Batch 1", "Batch 2"),
-    "storage": ("Timepoint:", "Fresh", "1 month old"),
+    "batch": ("Lot:", "Lot 9167, 28-30°C", "Lot A326, 21-25°C", "s"),
+    "storage": ("Timepoint:", "Fresh", "1 month old", "^"),
 }
 
 
@@ -272,7 +272,7 @@ def batch_and_storage(gels: pd.DataFrame) -> pd.DataFrame:
     rows = []
     fig, axes = plt.subplots(1, 2, figsize=(9.6, 5.0))
     for ax, (label, a, b, conds) in zip(axes, PAIRS, strict=False):
-        title, lab_a, lab_b = GROUP_LABELS[label]
+        title, lab_a, lab_b, mark_b = GROUP_LABELS[label]
         for i, cond in enumerate(conds):
             ax.axvspan(i - 0.42, i + 0.42, color=band, lw=0, zorder=0)
             va = gels[
@@ -282,7 +282,7 @@ def batch_and_storage(gels: pd.DataFrame) -> pd.DataFrame:
                 (gels.campaign == b) & (gels.condition_mg_ml == cond)
             ].median_kPa.to_numpy()
             _modulus_group(ax, i - 0.18, va, "o")
-            _modulus_group(ax, i + 0.18, vb, "^")
+            _modulus_group(ax, i + 0.18, vb, mark_b)
             if va.size < 2 or vb.size < 2:
                 continue
             rs = lstat.exact_ranksum(np.log(va), np.log(vb))
@@ -324,7 +324,9 @@ def batch_and_storage(gels: pd.DataFrame) -> pd.DataFrame:
         ax.set_axisbelow(True)
         ax.grid(axis="y", ls=":", lw=0.6, color="0.7")
         ax.plot([], [], "o", color="k", mec="k", ms=6, ls="none", label=lab_a)
-        ax.plot([], [], "^", color="k", mec="k", ms=6, ls="none", label=lab_b)
+        ax.plot(
+            [], [], mark_b, color="k", mec="k", ms=6, ls="none", label=lab_b
+        )
         leg = ax.legend(
             title=title,
             fontsize=7,

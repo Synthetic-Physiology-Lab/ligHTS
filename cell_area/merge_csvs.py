@@ -46,7 +46,7 @@ for file_list, condition, condition_idx in zip(
         data["experiment_idx"] = experiment
         data["FOV"] = int(name.split("_")[0])
         data["condition"] = condition
-        data["file_name"] = name.replace(",csv", "")
+        data["file_name"] = name.replace(".csv", "")
         data["experiment"] = path
         all_data.append(data)
 

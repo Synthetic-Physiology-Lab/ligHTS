@@ -6,11 +6,14 @@ the two modalities that share a height axis before any optical-to-physical
 correction, panel e places the confocal axial factor against the limits set by
 geometrical optics, and panel f overlays all three after calibration.
 
-Run ``python3 make_figure.py`` after ``run_calibration.py``.
+Run ``python3 make_figure.py`` after ``run_calibration.py``. The HPI panel is
+drawn from one field folder under ``HPI/HPI``; pass ``--field NAME`` to choose
+it, otherwise the first one alphabetically is used.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import pickle
 from pathlib import Path
@@ -131,7 +134,19 @@ def draw_map(
     bar.outline.set_linewidth(0.6)
 
 
-def load_maps() -> dict[str, tuple[np.ndarray, float]]:
+def default_hpi_field(base: Path) -> Path:
+    """Return the first field folder under HPI/HPI, or explain what is missing."""
+    root = base / "HPI" / "HPI"
+    fields = sorted(p for p in root.iterdir() if p.is_dir()) if root.is_dir() else []
+    if not fields:
+        raise SystemExit(
+            f"No field folders found in {root}. Expected one subfolder per field, "
+            "each holding that field's repeat TIFF frames (see README)."
+        )
+    return fields[0]
+
+
+def load_maps(hpi_field: Path) -> dict[str, tuple[np.ndarray, float]]:
     """Return one representative native map per modality, on a common field."""
     grid = np.load(BASE / "nano_grid.npy")
     nano = levelled(np.rot90(grid), M.NANO_STEP_UM)
@@ -141,7 +156,7 @@ def load_maps() -> dict[str, tuple[np.ndarray, float]]:
     peak[np.max(volume, axis=0) < np.median(volume) * 1.05] = np.nan
     confocal = levelled(centre_crop(peak, M.CONFOCAL_XY_UM, FIELD_UM), M.CONFOCAL_XY_UM)
 
-    opd = M.load_hpi_field(BASE / "HPI" / "HPI" / "Prefunction1")
+    opd = M.load_hpi_field(hpi_field)
     hpi = levelled(centre_crop(opd, M.HPI_XY_UM, FIELD_UM), M.HPI_XY_UM)
     return {
         "nano": (nano, nano.shape[1] * M.NANO_STEP_UM),
@@ -198,9 +213,26 @@ def load_profiles(calibration: dict) -> dict[str, tuple[np.ndarray, float]]:
 
 def main() -> None:
     """Assemble and write the figure in vector and raster formats."""
+    parser = argparse.ArgumentParser(
+        description="Build the six-panel multimodal calibration figure."
+    )
+    parser.add_argument(
+        "--field",
+        default=None,
+        help="Field folder under HPI/HPI to draw the HPI panel from "
+        "(default: the first one alphabetically).",
+    )
+    arguments = parser.parse_args()
+    if arguments.field:
+        hpi_field = BASE / "HPI" / "HPI" / arguments.field
+        if not hpi_field.is_dir():
+            raise SystemExit(f"Field folder not found: {hpi_field}")
+    else:
+        hpi_field = default_hpi_field(BASE)
+
     set_style()
     calibration = json.loads((BASE / "calibration.json").read_text())
-    maps = load_maps()
+    maps = load_maps(hpi_field)
     profiles = load_profiles(calibration)
 
     figure = plt.figure(figsize=(7.09, 4.9))

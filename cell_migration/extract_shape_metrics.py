@@ -58,7 +58,7 @@ except Exception:  # pragma: no cover
 LABELS_SUFFIX = "_cellpose_labels.tif"
 TRACKING_SUFFIX = "_tracking.csv"
 
-# Defaults mirror stack_cell_tracking_cli.py / migration_analysis_extended.py.
+# Defaults mirror stack_cell_tracking_cli.py.
 DEFAULT_UM_PER_PX = 1.34
 DEFAULT_INTERVAL_MIN = 15.0
 REFERENCE_AXIS_DEG = 90.0
@@ -228,8 +228,7 @@ def build_enriched_frames(
     return merged.drop(columns=["label"])
 
 
-# --- ported migration metrics (identical definitions to -------------------
-# --- migration_analysis_extended.py, sourced here from the labels) --------
+# --- ported migration metrics, sourced here from the labels ---------------
 
 
 def major_axis_angle_deg(orientation_rad: np.ndarray) -> np.ndarray:
@@ -291,6 +290,9 @@ def build_track_table(
         gaps = sub["frame"].diff().dropna()
         max_gap = int(gaps.max()) if len(gaps) else 1
         elapsed = (last - first) * interval_min
+        # Velocity's time base is (observed frames - 1) steps, matching
+        # migration_analysis.py; equals `elapsed` when the track has no gaps.
+        stepping_min = (observed - 1) * interval_min
         path_length = float(sub["step_distance_um"].sum(skipna=True))
         net = float(
             np.hypot(
@@ -326,7 +328,7 @@ def build_track_table(
                 "total_path_length_um": path_length,
                 "net_displacement_um": net,
                 "mean_velocity_um_per_min": (
-                    path_length / elapsed if elapsed > 0 else np.nan
+                    path_length / stepping_min if stepping_min > 0 else np.nan
                 ),
                 "persistence_ratio": (net / path_length if path_length > 0 else np.nan),
                 "weighted_nematic_order_axis_referenced": s_axis,
@@ -346,23 +348,51 @@ def build_track_table(
     return pd.DataFrame(records)
 
 
+def _weighted_mean(values: pd.Series, weights: np.ndarray) -> float:
+    """Weighted mean, ignoring non-finite values or non-positive weights."""
+    v = np.asarray(values, dtype=float)
+    w = np.asarray(weights, dtype=float)
+    keep = np.isfinite(v) & np.isfinite(w) & (w > 0)
+    if not keep.any():
+        return float("nan")
+    return float(np.average(v[keep], weights=w[keep]))
+
+
 def build_replicate_table(tracks: pd.DataFrame) -> pd.DataFrame:
     """Collapse retained tracks to one row per replicate."""
     kept = tracks[tracks["exclusion_status"] == "retained"]
-    grouped = kept.groupby(["replicate_id", "group"], as_index=False)
-    return grouped.agg(
-        number_of_retained_tracks=("track_uid", "nunique"),
-        weighted_nematic_order=("weighted_nematic_order_axis_referenced", "mean"),
-        weighted_nematic_order_magnitude=("weighted_nematic_order_magnitude", "mean"),
-        mean_cell_migration_velocity_um_per_min=("mean_velocity_um_per_min", "mean"),
-        mean_cell_area_um2=("mean_area_um2", "mean"),
-        mean_morphological_polarization=("mean_polarization_index", "mean"),
-        mean_persistence_ratio=("persistence_ratio", "mean"),
-        mean_orientation_migration_alignment=(
-            "mean_orientation_migration_alignment",
-            "mean",
-        ),
-    )
+
+    def _summarise(sub: pd.DataFrame) -> pd.Series:
+        # Weight each track by path length x number of steps, matching the FOV
+        # aggregation of the weighted nematic order in migration_analysis.py.
+        weight = sub["total_path_length_um"].to_numpy(dtype=float) * (
+            sub["observed_frames"].to_numpy(dtype=float) - 1.0
+        )
+        return pd.Series(
+            {
+                "number_of_retained_tracks": int(sub["track_uid"].nunique()),
+                "weighted_nematic_order": _weighted_mean(
+                    sub["weighted_nematic_order_axis_referenced"], weight
+                ),
+                "weighted_nematic_order_magnitude": _weighted_mean(
+                    sub["weighted_nematic_order_magnitude"], weight
+                ),
+                "mean_cell_migration_velocity_um_per_min": float(
+                    sub["mean_velocity_um_per_min"].mean()
+                ),
+                "mean_cell_area_um2": float(sub["mean_area_um2"].mean()),
+                "mean_morphological_polarization": float(
+                    sub["mean_polarization_index"].mean()
+                ),
+                "mean_persistence_ratio": float(sub["persistence_ratio"].mean()),
+                "mean_orientation_migration_alignment": float(
+                    sub["mean_orientation_migration_alignment"].mean()
+                ),
+            }
+        )
+
+    grouped = kept.groupby(["replicate_id", "group"], sort=False)
+    return grouped.apply(_summarise).reset_index()
 
 
 ENRICHED_COLUMNS = [

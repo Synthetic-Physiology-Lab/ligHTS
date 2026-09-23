@@ -23,9 +23,10 @@ Notes
 - ND2 reading depends on installed backends; see 'requirements.txt' for versions.
 - The analyzer script is verified (100% pass summarized by the validator script) against synthetic ground truth
   (synthetic dataset produced by the generator script from a known forward model).
+  The synthetic stacks have near-complete bead coverage: the generator's signal-dropout step removes only a few
+  small correlated patches.
 - This code is intended for the sole use of analyzing the datasets and extracting the hydrogel
-  heights displayed in figure 2 c-f-g-h of the manuscript "LigHTS: Massively Parallel Biomimetic
-  Photo-Functionalization for Imaging-Based Ultra-High-Throughput Screening" 
+  heights displayed in figure 2 c-f-g-h of the manuscript "LigHTS: Biomimetic Hydrogel Photo-Fabrication for Imaging-Based Ultra-High-Throughput Screening" 
 
 ## Install
 

@@ -27,12 +27,29 @@ Workflow
 
 Optional calibration against nanoindentation and confocal images
 -------------------
-1) create in the same folder of the code a subfolder called tiff containing the tiff version of confocal calibration data
-2) create in the same folder of the code a subfolder named conf_out containing groove_recap.csv as created via groove_analyzer.py
-3) create in the same folder of the code two nested folders HPI/HPI containing the raw holographic microscopy data
-4) create in the same folder of the code a folder named NanoindentationChiaro containing raw nanoindentation data
-5) run run_calibration.py
-6) run make_figure.py to get the final image
+Both scripts expect this layout next to the code (or next to the folder given by
+`run_calibration.py --base`). Note that `HPI/HPI` must contain **one subfolder per
+field**, each holding that field's repeat TIFF frames; raw frames placed directly in
+`HPI/HPI` are skipped and both scripts stop with an error.
+
+```
+holographic_reconstruction/
+├── tiff/                      # TIFF version of the confocal calibration stacks
+│   └── *.tif
+├── conf_out/
+│   └── groove_recap.csv       # produced by groove_analyzer.py
+├── HPI/
+│   └── HPI/
+│       ├── <field_1>/         # e.g. Prefunction1
+│       │   └── *.tif          # repeat frames of that field
+│       └── <field_2>/
+│           └── *.tif
+└── NanoindentationChiaro/     # raw nanoindentation data
+```
+
+1) run `run_calibration.py` (add `--base PATH` if the folders above live elsewhere)
+2) run `make_figure.py` to get the final image. It draws the HPI panel from the first
+   field folder alphabetically; use `--field <name>` to pick a different one.
 
 Optional validation
 ---------------------
@@ -62,16 +79,19 @@ Notes
 
 - The analyzer script is verified (100% pass summarized by the validator script)
   against synthetic ground truth (synthetic dataset produced by the generator script
-  from a known forward model)
+  from a known forward model). A sample passes on pitch and on depth when the error is within
+  **either** the MAPE limit (3% pitch, 5% depth) **or** an absolute floor of 2 pixels for pitch and
+  2 gray levels for depth (1.08 um and 0.59 um at the default 0.54 um/px and 75/255 um-per-gray
+  calibration). At small pitch and depth the absolute floor is the looser of the two, so the pass rate
+  should be read against both. All limits are listed in the Acceptance Criteria table of the
+  generated `VALIDATION_REPORT.md`.
 
 - The analyzer code is intended for the sole use of analyzing the datasets and extracting the hydrogel
-  geometries displayed in figure 6 e-f of the manuscript "LigHTS: Massively Parallel Biomimetic 
-  Photo-Functionalization for Imaging-Based Ultra-High-Throughput Screening" 
+  geometries displayed in figure 6 e-f of the manuscript "LigHTS: Biomimetic Hydrogel Photo-Fabrication for Imaging-Based Ultra-High-Throughput Screening" 
 
 - The 'holo_to_tiff.py' code to convert from holographic images to tiff stacks and obtain the median is also used to
   isolate cells for subsequent segmentation, tracking, and extract migration parameters reported in figure 6 d
-  and supplementary figures and videos of the manuscript "LigHTS: Massively Parallel Biomimetic 
-  Photo-Functionalization for Imaging-Based Ultra-High-Throughput Screening" 
+  and supplementary figures and videos of the manuscript "LigHTS: Biomimetic Hydrogel Photo-Fabrication for Imaging-Based Ultra-High-Throughput Screening" 
 
 ## Input requirements
 
@@ -149,5 +169,10 @@ Per-period arrays are also written whenever the corresponding values are availab
 In the root directory (the selected folder, or the input file's parent):
 - 'groove_recap.csv' – one-row-per-file summary of all key metrics
 - 'run_metadata.json' – run-level provenance (script version, platform, calibration)
+
+Quality control: every row of 'groove_recap.csv' carries `qc_pass` and `qc_reasons`, evaluated against
+`qc_min_valid_frac` and `qc_min_grooves` in `AnalyzerConfig` (and repeated in '_analysis_summary.txt'). These flags are
+reported only - no stack is excluded on the basis of them, so any exclusion is a downstream, auditable decision.
+
 
 Note: each input TIFF gets its own `FILE_proc/` subfolder for the per-file outputs listed above; the root-level files sit alongside those subfolders.

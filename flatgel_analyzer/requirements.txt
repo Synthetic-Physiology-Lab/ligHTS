@@ -5,5 +5,4 @@ matplotlib==3.8.4
 opencv-python-headless==4.9.0.80
 aicsimageio[nd2]==4.14.0
 nd2==0.10.0
-tifffile
-openpyxl==3.1.5
+tifffile==2023.2.28

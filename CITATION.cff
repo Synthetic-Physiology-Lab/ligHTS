@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "LigHTS: Massively Parallel Biomimetic Photo-Functionalization for Imaging-Based Ultra-High-Throughput Screening"
+title: "LigHTS: Biomimetic Hydrogel Photo-Fabrication for Imaging-Based Ultra-High-Throughput Screening"
 authors:
   - family-names: Enrico
     given-names: Alessandro
@@ -26,8 +26,7 @@ authors:
   - family-names: Pasqualini
     given-names: "Francesco S."
     orcid: "https://orcid.org/0000-0001-7038-3121"
-doi: 10.5281/zenodo.21840233
-date-released: 2026-08-07
+doi: 10.5281/zenodo.21840232
 url: "https://github.com/Synthetic-Physiology-Lab/ligHTS"
 repository-code: "https://github.com/Synthetic-Physiology-Lab/ligHTS"
 license: MIT

@@ -70,6 +70,12 @@ def main() -> int:
             }
         )
         print(f"hpi    {folder.name}: OPD {result.depth_mean_um:.2f} nm")
+    if not records:
+        raise SystemExit(
+            f"No field folders found in {base / 'HPI' / 'HPI'}. Expected one "
+            "subfolder per field, each holding that field's repeat TIFF frames "
+            "(see README)."
+        )
     hpi = pd.DataFrame(records)
     hpi.to_csv(base / "hpi_fields.csv", index=False)
 

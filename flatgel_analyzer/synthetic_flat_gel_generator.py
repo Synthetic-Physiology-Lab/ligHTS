@@ -7,7 +7,7 @@ realistic noise to validate the gel surface analysis pipeline.
 Features:
   - Rounded-rectangle well geometry matching real microwell plates
   - Planar tilt with optional roughness
-  - Confocal PSF convolution with realistic signal dropout (~30%)
+  - Confocal PSF convolution with sparse signal dropout
   - Shot noise, read noise, and background fluorescence
   - 12-bit quantization
 
@@ -73,7 +73,10 @@ class ImagingConfig:
     bit_depth: int = 12
     psf_fwhm_xy_um: float = 2.0
     psf_fwhm_z_um: float = 3.5
-    signal_dropout_frac: float = 0.30
+    # Threshold applied to spatially smoothed uniform noise, not a dropped
+    # fraction: the synthetic stacks have near-complete bead coverage.
+    # See render_surface_to_volume.
+    signal_dropout_threshold: float = 0.30
 
 
 @dataclass
@@ -232,7 +235,7 @@ def simulate_zstack(
     """
     Generate confocal Z-stack from height map.
 
-    Simulates confocal imaging with PSF, signal dropout (~30%), shot noise,
+    Simulates confocal imaging with PSF, sparse signal dropout, shot noise,
     read noise, and quantization. Returns (volume, z_min, z_max).
     """
     ny, nx = height_map.shape
@@ -255,7 +258,14 @@ def simulate_zstack(
     sigma_z_px = sigma_z_um / imaging.dz_um
 
     volume = render_surface_to_volume(
-        height_map, z_min, imaging.dz_um, nz, ny, nx, imaging.signal_dropout_frac, rng
+        height_map,
+        z_min,
+        imaging.dz_um,
+        nz,
+        ny,
+        nx,
+        imaging.signal_dropout_threshold,
+        rng,
     )
 
     volume = gaussian_filter(volume, sigma=[sigma_z_px, sigma_xy_px, sigma_xy_px])
@@ -292,14 +302,15 @@ def render_surface_to_volume(
     nz: int,
     ny: int,
     nx: int,
-    dropout_frac: float,
+    dropout_threshold: float,
     rng: np.random.Generator,
 ) -> np.ndarray:
     """
     Render surface height map to 3D volume with signal dropout.
 
-    Creates spatially correlated dropout mask (~30% of surface) to simulate
-    realistic bead coverage. Returns float32 volume array.
+    Uniform noise is smoothed (sigma = 1.5 px) and thresholded at
+    ``dropout_threshold``. Bead coverage is near-complete: only a few
+    small correlated patches are removed. Returns float32 volume array.
     """
     volume = np.zeros((nz, ny, nx), dtype=np.float32)
     z_idx = (height_map - z_min) / dz_um
@@ -312,7 +323,7 @@ def render_surface_to_volume(
 
     dropout_noise = rng.random((ny, nx)).astype(np.float32)
     dropout_noise = gaussian_filter(dropout_noise, sigma=1.5)
-    dropout_mask = dropout_noise > dropout_frac
+    dropout_mask = dropout_noise > dropout_threshold
 
     has_signal = valid & dropout_mask
 
@@ -848,7 +859,10 @@ def log_dataset_info(total: int, imaging: ImagingConfig, config: ValidationConfi
         config.height_span_min_um,
         config.height_span_max_um,
     )
-    LOG.info("  Signal dropout: %.0f%%", imaging.signal_dropout_frac * 100)
+    LOG.info(
+        "  Signal dropout threshold: %.2f (near-complete bead coverage)",
+        imaging.signal_dropout_threshold,
+    )
 
 
 def generate_scenario_samples(
@@ -974,7 +988,7 @@ Output:
   - truth_metrics.csv : Ground truth metrics using analyzer-compatible names
 
 All samples constrained to 50-100 µm height span.
-Signal includes ~30% dropout to simulate realistic bead coverage.
+Bead coverage is near-complete; only a few small correlated patches drop out.
         """,
     )
 

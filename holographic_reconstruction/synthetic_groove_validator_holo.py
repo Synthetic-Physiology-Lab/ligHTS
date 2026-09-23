@@ -513,7 +513,18 @@ def _write_report(
         f.write("| Metric | Threshold |\n|---|---:|\n")
         f.write(f"| Pitch MAPE | ≤ {th['pitch_mape_thresh_pct']}% |\n")
         f.write(f"| Depth MAPE | ≤ {th['depth_mape_thresh_pct']}% |\n")
+        f.write(
+            "| Pitch |abs err| (fallback) | ≤ 2 px of the sample's xy calibration |\n"
+        )
+        f.write(
+            "| Depth |abs err| (fallback) | ≤ 2 gray levels of the sample's z "
+            "calibration |\n"
+        )
         f.write(f"| Angle error | ≤ {th['angle_err_thresh_deg']}° |\n\n")
+        f.write(
+            "A sample passes on pitch and on depth when the error is within the MAPE "
+            "limit **or** within the absolute fallback, whichever is looser.\n\n"
+        )
 
         f.write("## Error Statistics\n\n")
         f.write("| Metric | Mean | Std | Max |\n|---|---:|---:|---:|\n")

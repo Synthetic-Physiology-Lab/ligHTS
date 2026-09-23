@@ -83,6 +83,37 @@ class AnalyzerConfig:
 
 CONFIG = AnalyzerConfig()
 
+
+def evaluate_qc(
+    valid_frac: float,
+    n_grooves: float,
+    config: AnalyzerConfig = CONFIG,
+) -> Tuple[bool, str]:
+    """Assess one stack against the configured QC thresholds. Report only.
+
+    Returns ``(qc_pass, qc_reasons)``, where ``qc_reasons`` is a
+    semicolon-separated list of the criteria that failed (empty when the
+    stack passes). Nothing is excluded on the basis of this result: the
+    flags are written to the per-file summary, results CSV and run
+    metadata so that exclusion decisions are made, and can be audited,
+    downstream.
+    """
+    reasons: List[str] = []
+
+    if not math.isfinite(valid_frac):
+        reasons.append("valid_frac=nan")
+    elif valid_frac < config.qc_min_valid_frac:
+        reasons.append(
+            f"valid_frac={valid_frac:.3f}<{config.qc_min_valid_frac:.2f}"
+        )
+
+    if not math.isfinite(n_grooves):
+        reasons.append("n_grooves=nan")
+    elif n_grooves < config.qc_min_grooves:
+        reasons.append(f"n_grooves={n_grooves:.0f}<{config.qc_min_grooves}")
+
+    return (not reasons), ";".join(reasons)
+
 FIGSIZE_IN = (6, 6)
 
 
@@ -620,15 +651,12 @@ def measure_depth_per_groove(
 
         row_depth_values.extend(row_clean.tolist())
 
-    if row_depth_values:
+    # The per-row pool is kept only for diagnostic outputs (histogram + CSV). It
+    # is NOT used for the reported value or u_a/n: rows one pixel apart sample the
+    # same groove and are not independent, so the effective replicate count is the
+    # number of grooves (the averaged profile above).
+    if row_depth_values and outdir is not None and file_stem is not None:
         arr = np.asarray(row_depth_values, dtype=float)
-        mean_fov = np.nanmean(arr)
-        sd_fov = np.nanstd(arr)
-    else:
-        mean_fov = float("nan")
-        sd_fov = float("nan")
-
-    if outdir is not None and file_stem is not None and row_depth_values:
         if config.generate_plots and arr.size >= 10:
             plot_histogram(
                 arr,
@@ -646,16 +674,7 @@ def measure_depth_per_groove(
                 if np.isfinite(v):
                     w.writerow([float(v)])
 
-    if row_depth_values:
-        # The reported value is mean_fov, the mean of the row pool `arr`; derive
-        # u_a, u_b and n from that same sample rather than from the averaged profile.
-        u_a = float(np.nanstd(arr, ddof=1) / math.sqrt(arr.size))
-        u_b_cal = float(config.u_rel_calibration * mean_fov)
-        u_b = float(math.sqrt(u_b_res**2 + u_b_cal**2))
-        n_out = int(arr.size)
-    else:
-        n_out = int(clean.size)
-    return MeasurementResult(mean_fov, u_a=u_a, u_b=u_b, n=n_out, rmse=sd_fov)
+    return MeasurementResult(mean, u_a=u_a, u_b=u_b, n=int(clean.size), rmse=std)
 
 
 def plot_height_map(h: np.ndarray, xy_um: float, outpath: Path, title: str) -> None:
@@ -802,10 +821,15 @@ def analyze_file(
     )
 
     if not np.isfinite(fft_pitch_um):
+        _, qc_reasons = evaluate_qc(valid_frac, float("nan"), config)
         return {
             "file": fpath.name,
             "error": "Failed to estimate pitch (FFT)",
             "valid_pixel_frac": valid_frac,
+            "qc_pass": False,
+            "qc_reasons": ";".join(
+                r for r in ("fft_pitch_failed", qc_reasons) if r
+            ),
             **load_meta,
             **scale_meta,
             **fft_qc,
@@ -866,6 +890,17 @@ def analyze_file(
                 outdir / f"{fpath.stem}_avg_profile_annotated",
             )
 
+    qc_pass, qc_reasons = evaluate_qc(
+        valid_frac, float(pitch_res.n), config
+    )
+    if not (
+        np.isfinite(pitch_res.value) or np.isfinite(depth_res.value)
+    ):
+        qc_pass = False
+        qc_reasons = ";".join(
+            r for r in ("no_measurable_grooves", qc_reasons) if r
+        )
+
     results: Dict[str, Any] = {
         "file": fpath.name,
         "folder": fpath.parent.name,
@@ -897,6 +932,8 @@ def analyze_file(
         "depth_n": int(depth_res.n),
         "depth_rmse_um": float(depth_res.rmse),
         "n_grooves": int(pitch_res.n),
+        "qc_pass": qc_pass,
+        "qc_reasons": qc_reasons,
         **load_meta,
         **scale_meta,
         **fft_qc,
@@ -923,6 +960,17 @@ def analyze_file(
             )
         else:
             f.write("  Depth: NaN\n")
+        f.write("\nQUALITY CONTROL (reported, not applied):\n")
+        f.write(
+            f"  Valid pixels: {valid_frac * 100:.1f}% "
+            f"(threshold {config.qc_min_valid_frac * 100:.0f}%)\n"
+        )
+        f.write(
+            f"  Grooves measured: {pitch_res.n} "
+            f"(threshold {config.qc_min_grooves})\n"
+        )
+        f.write(f"  qc_pass: {qc_pass}\n")
+        f.write(f"  qc_reasons: {qc_reasons or '-'}\n")
         f.write(
             "\nNOTE: Gel thickness/height is not estimated from holographic "
             "phase imaging in this pipeline.\n"
@@ -936,6 +984,12 @@ def analyze_file(
         "load_meta": load_meta,
         "scale_meta": scale_meta,
         "fft_qc": fft_qc,
+        "qc": {
+            "qc_pass": bool(qc_pass),
+            "qc_reasons": qc_reasons,
+            "valid_pixel_frac": float(valid_frac),
+            "n_grooves": int(pitch_res.n),
+        },
         "config": {k: getattr(config, k) for k in config.__dataclass_fields__.keys()},
     }
     with (outdir / f"{fpath.stem}_run_metadata.json").open("w", encoding="utf-8") as f:
@@ -1001,9 +1055,24 @@ def analyze_batch(
             )
         except Exception as exc:
             LOGGER.exception("Failed %s", p)
-            all_results.append({"file": p.name, "error": str(exc)})
+            all_results.append(
+                {
+                    "file": p.name,
+                    "error": str(exc),
+                    "qc_pass": False,
+                    "qc_reasons": "analysis_exception",
+                }
+            )
 
     write_csv(root / "groove_recap.csv", all_results)
+
+    n_flagged = sum(1 for r in all_results if r.get("qc_pass") is False)
+    if n_flagged:
+        LOGGER.warning(
+            "QC flagged %d/%d files (reported only, none excluded)",
+            n_flagged,
+            len(all_results),
+        )
 
     return all_results
 

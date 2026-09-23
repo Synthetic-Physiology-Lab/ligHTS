@@ -8,7 +8,7 @@ campaigns.
 
 This folder ships the software only; it contains no data files. The dataset
 (raw curves, synthetic set, results and validation) is archived separately on
-Zenodo, [10.5281/zenodo.21840233](https://doi.org/10.5281/zenodo.21840233).
+Zenodo, [10.5281/zenodo.21840232](https://doi.org/10.5281/zenodo.21840232).
 Download and unpack it, then point the code at it: every script resolves its
 paths from one `ROOT` constant, which defaults to `../data` and is overridden
 by the `LIGHTS_DATA` environment variable.
@@ -19,7 +19,7 @@ code/     pyproject.toml, setup.cfg, _common/, scripts/, verify.py
 
 ```bash
 # example: run against the unpacked archive wherever it lives
-export LIGHTS_DATA=/path/to/data
+set LIGHTS_DATA=/path/to/data
 python code/scripts/03_analyse.py
 ```
 

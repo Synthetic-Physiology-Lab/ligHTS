@@ -931,7 +931,8 @@ def depth_diagnostics(
         depth_um = (s - s0_nm) / 1000.0
         # 2a, twice the Hertz contact radius a = sqrt(R delta), in um
         two_a_um = 2.0 * np.sqrt(p.radius_um * np.clip(depth_um, 1e-9, None))
-        e_pt = 1.0e6 * k / two_a_um
+        # E* = k / (2a); k is in N/m and 2a in um, so 1e3 gives kPa.
+        e_pt = 1.0e3 * k / two_a_um
     for d in pointwise_um:
         m = (depth_um >= d) & (depth_um < d + bin_width_um) & np.isfinite(e_pt)
         out[f"Ept_{d:.2f}_kPa"] = (

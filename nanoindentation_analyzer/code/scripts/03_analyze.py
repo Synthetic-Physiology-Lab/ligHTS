@@ -46,7 +46,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # nopep8
 from matplotlib.colors import LogNorm  # nopep8
 
-RAW = ROOT / "raw"
+import inspect  # nopep8
+PREPARE_KEYS = frozenset(
+    k for k in inspect.signature(lf.prepare).parameters if k != "rc"
+)
+RAW = ROOT
 OUT = ROOT / "results"
 CAMPAIGN_LABEL = {
     "D1_June2025": "batch 1 (17 Jul 2025)",

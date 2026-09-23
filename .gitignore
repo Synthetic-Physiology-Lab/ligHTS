@@ -9,3 +9,6 @@ __pycache__/
 
 # Generated synthetic-validation output
 flat_gel_validation_*/
+
+# Claude Code session worktrees
+.claude/
