@@ -1,4 +1,4 @@
-# LigHTS full repository
+# LigHTS full scripts repository
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21840232.svg)](https://doi.org/10.5281/zenodo.21840232)
 

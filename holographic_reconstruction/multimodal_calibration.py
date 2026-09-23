@@ -20,20 +20,7 @@ under-reading, so the reference depth is a lower bound.
 Order of operations matters and is enforced here: the nanoindentation surface is
 reconstructed first, then the confocal factor is derived against it, and only
 then is the holographic index difference derived. No constant is assumed a
-priori; in particular ``delta_n`` is *not* taken from the value hard-coded in
-the acquisition script.
-
-References
-----------
-Carlsson K, J. Microsc. 163, 167 (1991) - paraxial axial scaling.
-Visser T D et al., Optik 90, 17 (1992) - marginal-ray axial scaling.
-Besseling T H et al., J. Microsc. 257, 142 (2015).
-Diel E E et al., Nat. Protoc. 15, 2773 (2020).
-Rappaz B et al., Opt. Express 13, 9361 (2005) - quantitative phase, path integral.
-Marquet P et al., Opt. Lett. 30, 468 (2005).
-Barer R, Nature 169, 366 (1952) - refractive increment of protein solutions.
-Johnson K L, Contact Mechanics, CUP (1985), ch. 4.
-ISO 25178-2:2021; ISO 16610-21:2011; ISO 16610-31:2016.
+priori. 
 """
 
 from __future__ import annotations

@@ -1,9 +1,9 @@
 # UV mask diffraction (1D periodic grating, scalar model)
 
 ## Summary
-- Provides a **first-order scalar diffraction** model to compute 1D intensity profiles behind an **infinite periodic binary amplitude line grating** under **finite source divergence**.
-- Intended for **qualitative/illustrative optics-only reasoning** (e.g., why a binary mask can yield a smoother, approximately sinusoidal profile at finite z), **not** for quantitative exposure prediction.
-- Outputs publication-oriented **PNG** plots and matching **CSV** profiles from a single Python script.
+- Provides a scalar diffraction model to compute 1D intensity profiles behind an infinite periodic binary amplitude line grating under finite source divergence.
+- Intended for qualitative/illustrative optics-only reasoning
+- Outputs are PNG plots and matching CSV profiles from a single Python script.
 
 ### Key features
 - Scalar Helmholtz propagation using an exact transfer function (non-paraxial).

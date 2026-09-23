@@ -51,8 +51,6 @@ def plot_masks_next_to_image(image, masks, img_file, plot_dir, save_masks=True):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
     # Plot reference image (left)
     image = normalize(np.moveaxis(image, 0, -1), axis=(0, 1), pmin=1)
-    # zero out brightfield
-    image[..., 2] = 0.0
     image = np.clip(image, 0, 1)
     ax1.imshow(image)
     ax1.set_title("Image", fontsize=14)

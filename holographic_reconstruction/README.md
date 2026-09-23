@@ -13,7 +13,7 @@ Workflow
 4) First frame per FOV:
      - Convert 16-bit phase→height (µm) using metadata
        'Min (0) = ... Max (65535) = ...' and
-         h = φ * λ / (2πΔn) with Δn=0.00278, λ=0.635 µm (physical parameters of the system)
+         h = φ * λ / (2πΔn) with Δn=0.00278, λ=0.635 µm (physical parameters of the system, Δn was corrected based on the calibration via nanoindentation)
      - Estimate dominant grating angle via 2D FFT (grating normal).
      - Rotate to make grooves vertical; estimate pitch (µm) via 1D FFT.
 5) Apply the same rotation to all frames; compute the largest

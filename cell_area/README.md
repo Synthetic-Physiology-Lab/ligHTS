@@ -24,8 +24,8 @@ conda activate cell_area
 
 ## Input layout
 
-All three scripts glob relative to the **current working directory**, so run them from the folder
-that holds the experiment folders, not from `cell_area/`:
+All three scripts glob relative to the current working directory, so run them from the folder
+that holds the experiment folders:
 
 ```
 <your data root>/            <- run the scripts from here
@@ -54,9 +54,6 @@ The naming is part of the contract and is not configurable:
   | `75_flat` | Softer gels | 2 |
   | `CNTRL` | Control | 1 |
 
-Run from `cell_area/` instead and the globs match nothing: segmentation reports `Found 0 files to
-process`, and the other two scripts stop with `ValueError: No objects to concatenate`.
-
 ## Basic usage
 We use the new Cellpose SAM and segment the tubulin and actin channels together to get reliable cell masks that are analyzed to extract and plot cell area for statistical analysis.
 
@@ -73,26 +70,20 @@ The `plot_histograms.py` reads the per-image CSVs and writes histograms for quic
 
 The `merge_csvs.py` concatenates all per-image CSVs into a single dataset for downstream statistics and plotting.
 
-### Provenance / auditability
-Each script records the SHA-256 of the exact code version that produced the outputs:
-`segment_cellpose_sam_masks.py` adds an `analysis_info` column (`name|version|sha256|timestamp`) to every
-per-cell CSV and writes `segmentation_provenance.json`; `merge_csvs.py` adds a `merge_info` column to
-`data_ligHTS_cell_area.csv` and writes `merge_provenance.json`; `plot_histograms.py` writes
-`histograms_provenance.json`.
 
 1. **Segmentation**:
    ```bash
-   python segment_cellpose_sam_masks.py
+   python /path/to/cell_area/segment_cellpose_sam_masks.py
    ```
 
 2. **Plot histograms**:
    ```bash
-   python plot_histograms.py
+   python /path/to/cell_area/plot_histograms.py
    ```
 
 3. **Merge CSVs**:
    ```bash
-   python merge_csvs.py
+   python /path/to/cell_area/merge_csvs.py
 
    ```
 

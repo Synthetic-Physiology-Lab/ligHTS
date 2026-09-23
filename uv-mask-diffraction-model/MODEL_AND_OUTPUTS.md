@@ -1,7 +1,7 @@
 # Model and outputs
 
 ## Core computation
-The script computes the 1D intensity profile behind a periodic line grating by decomposing the mask transmission into diffraction orders and propagating each order with the **exact** scalar Helmholtz propagator:
+The script computes the 1D intensity profile behind a periodic line grating by decomposing the mask transmission into diffraction orders and propagating each order with the exact scalar Helmholtz propagator:
 
 - Grating period: `pitch_um`
 - Harmonic index: `m`
@@ -51,5 +51,4 @@ The following constants near the top of `uv_mask_profile_divergence.py` control 
 - Distances: `Z_LIST_UM`
 - Divergence half-angles: `DIVERGENCES_DEG`
 - Cone model + sampling: `CONE_MODEL`, `N_THETA`, `N_PHI`
-- Geometry: `LINE_WIDTHS_UM` (pitch defaults to 2×width)
 - Spatial sampling: `DX_TARGET_UM`

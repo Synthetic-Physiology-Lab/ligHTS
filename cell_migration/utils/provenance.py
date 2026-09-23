@@ -29,10 +29,20 @@ def write_provenance(
     best-effort: missing git or an unreadable script degrade to "unknown"
     rather than raising.
     """
-    try:
-        commit = subprocess.getoutput("git rev-parse --short HEAD") or "unknown"
-    except Exception:
-        commit = "unknown"
+    commit = "unknown"
+    if script_path:
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=pathlib.Path(script_path).resolve().parent,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                commit = result.stdout.strip() or "unknown"
+        except (OSError, ValueError):
+            pass
 
     script_name = "unknown"
     script_sha256 = "unknown"
