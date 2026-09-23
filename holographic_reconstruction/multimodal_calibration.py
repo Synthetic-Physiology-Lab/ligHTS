@@ -76,7 +76,8 @@ HPI_PHASE_TAG = 40092  # private tag carrying "Min (0) = .. Max (65535) = .."
 # Medium refractive index at the source wavelength and 37 C (PBS).
 MEDIUM_INDEX = 1.3316
 
-# Value hard-coded in the acquisition script, retained only for comparison.
+# Earlier hard-coded value in the acquisition script, retained only for
+# comparison; holo_to_tiff.py now uses the calibrated DELTA_N.
 LEGACY_DELTA_N = 0.0064
 LEGACY_HPI_XY_UM = 0.54
 

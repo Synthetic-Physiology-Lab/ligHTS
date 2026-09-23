@@ -1,13 +1,22 @@
 """Step 2: run the pipeline on the synthetic set and compare against truth.
 
-Three quantities are reported per curve:
+Four quantities are reported per curve:
 
 **Model-form bias** = E*(noise-free twin) / E*(true bulk).
-**Robustness** = E*(noisy curve) / E*(noise-free twin). 
-**Predicted bias** = take the generator's own noise-free curve, measure indentation
-from the recorded true contact point, and take the least-squares Hertz slope
-over the indentation interval the estimator analysed, with the apparent
-contact pinned at the offset the estimator found. 
+**Robustness** = E*(noisy curve) / E*(noise-free twin).
+**Predicted bias** = a Hertz fit of the scenario's own force law, rebuilt
+from the generator's mechanics and evaluated at the true contact point over
+the interval the estimator analyses. The measured force is never read, so it
+is a forward calculation rather than a refit of the curve being judged. It is
+reported, never asserted, and where it differs from the model-form bias the
+difference includes where the estimator placed its contact point, not the
+force law alone.
+
+**Recovery** = E*(noisy curve) / E*(true bulk), and only on the scenarios
+where a half-space Hertz answer is defined. A bonded film, a surface layer, a
+graded gel, an adhesive or a viscoelastic contact has no half-space truth to
+recover, so recovery is left undefined there and the departure of an
+uncorrected fit is reported as ``ratio_to_true`` instead.
 
 The three supporting methods are run alongside the pipeline on every curve.
 A fifth column, ``film_known_thickness``, is the film method told the true
@@ -43,6 +52,7 @@ sys.path.insert(0, str(CODE / "_common"))
 import lights_fit as lf  # nopep8
 import lights_qc as lq  # nopep8
 import lights_raw as lr  # nopep8
+import lights_synth as ls  # nopep8
 import matplotlib  # nopep8
 
 matplotlib.use("Agg")
@@ -99,20 +109,44 @@ def fit_all(rc, true_thickness_um: float = float("nan")) -> tuple:
     return p, fits, lq.qc_curve(p, fit)
 
 
-def predicted_bias(rc, truth_row: pd.Series, s0_fit_um: float) -> float:
-    """Forward model-form term
+def predicted_bias(rc, truth_row: pd.Series) -> float:
+    """What the scenario's own mechanics imply, over the true modulus.
+
+    The generator's force law is rebuilt with
+    ``lights_synth.scenario_mechanics`` -- the same callable the curve was
+    generated with, not a second copy of the formulas -- evaluated on the
+    recorded displacement history with the contact at the **true** contact
+    point, and fitted with a through-origin Hertz slope over the indentation
+    interval the estimator analyses. The measured force is never read.
+
+    That is what makes it a forward calculation. Measuring indentation from
+    the true contact and then subtracting the offset the estimator found
+    would leave ``s - s0_fit``: a second fit of the same curve at the
+    estimator's own contact point, which no generator parameter survives
+    into and which therefore cannot say whether an offset is the one the
+    mechanics imply.
+
+    Reported, never asserted. Where it differs from ``model_bias`` the
+    difference is not the force law alone: the estimator has to locate its
+    own contact point, and on a layered, graded or adhesive surface that
+    lands some way from the true one, which moves the interval it analyses.
     """
-    shift_nm = s0_fit_um * 1000.0 - truth_row.s0_true_nm
-    if not np.isfinite(shift_nm):
+    mechanics = ls.scenario_mechanics(
+        truth_row.scenario, truth_row.s0_true_nm
+    )
+    time_s = np.asarray(rc.time_s, dtype=float)
+    dt_s = float(np.median(np.diff(time_s))) if time_s.size > 1 else np.nan
+    depth = np.asarray(rc.s_nm, dtype=float) - float(truth_row.s0_true_nm)
+    f = np.asarray(mechanics(np.asarray(rc.s_nm, dtype=float), dt_s)) * 1e9
+    if not np.isfinite(f).any():
         return float("nan")
-    f = rc.load_uN * 1000.0
-    f = f - float(np.median(f[rc.time_s <= rc.time_s[0] + 0.10]))
     peak_i = int(np.nanargmax(f))
-    depth = rc.s_nm - truth_row.s0_true_nm - shift_nm
     win = (
         (np.arange(f.size) <= peak_i)
         & (depth >= lf.FIT_MIN_DEPTH_UM * 1000.0)
         & (depth <= lf.FIT_MAX_DEPTH_UM * 1000.0)
+        & np.isfinite(f)
+        & np.isfinite(depth)
     )
     if int(win.sum()) < 25:
         return float("nan")
@@ -133,12 +167,7 @@ def noise_free_pass(truth: pd.DataFrame) -> dict:
             ok = r is not None and r.ok
             out[(tr.scenario, name, "e")] = r.e_star_kPa if ok else np.nan
             out[(tr.scenario, name, "s0")] = r.contact_s0_um if ok else np.nan
-        ref = fits.get("pipeline")
-        out[(tr.scenario, "pipeline", "pred")] = (
-            predicted_bias(rc, tr, ref.contact_s0_um)
-            if ref is not None and ref.ok
-            else np.nan
-        )
+        out[(tr.scenario, "pipeline", "pred")] = predicted_bias(rc, tr)
     return out
 
 
@@ -313,12 +342,13 @@ def main() -> None:
     df["ratio_to_true"] = df.e_star_kPa / df.e_true_kPa
     df["s0_error_um"] = df.contact_s0_um - df.s0_true_um
     df["s0_noisefree_error_um"] = df.s0_noisefree_um - df.s0_true_um
-    # Recovery target: the true bulk modulus where a half-space Hertz answer
-    # is defined, and the forward-predicted value where the physics moves it.
+    # Recovery is only defined where a half-space Hertz answer is. Where the
+    # physics moves the answer there is no half-space truth to recover: the
+    # departure of an uncorrected fit is reported as ratio_to_true and left
+    # unscored, rather than measured against a target derived from the fit
+    # itself.
     df["e_target_kPa"] = np.where(
-        df.half_space_hertz_defined,
-        df.e_true_kPa,
-        df.predicted_bias * df.e_true_kPa,
+        df.half_space_hertz_defined, df.e_true_kPa, np.nan
     )
     df["recovery"] = df.e_star_kPa / df.e_target_kPa
     df.to_csv(OUT / "validation_master.csv", index=False)
@@ -381,23 +411,24 @@ def main() -> None:
     )
 
     kept = df[(df.method == "pipeline") & (~df.pathology) & df.qc_pass]
-    inside = np.abs(kept.recovery - 1.0) <= TOLERANCE
-    grp = kept.half_space_hertz_defined
+    half_space = kept[kept.half_space_hertz_defined]
+    inside = np.abs(half_space.recovery - 1.0) <= TOLERANCE
     print(
         f"\nrecovery within +/-{100 * TOLERANCE:.0f} %: "
-        f"{100 * float(inside.mean()):.1f} % of {len(kept)} retained curves "
-        f"(half-space {100 * float(inside[grp].mean()):.1f} % of "
-        f"{int(grp.sum())}, physics-moved "
-        f"{100 * float(inside[~grp].mean()):.1f} % of {int((~grp).sum())})"
+        f"{100 * float(inside.mean()):.1f} % of {len(half_space)} retained "
+        "curves, over the scenarios where a half-space answer is defined"
     )
-    worst = (
-        core[core.pathology.eq(False) & ~core.half_space_hertz_defined]
-        .assign(gap=lambda d: (d.model_bias / d.predicted_bias - 1).abs())
-        .gap.max()
+    moved = core[core.pathology.eq(False) & ~core.half_space_hertz_defined]
+    print(
+        "\nthe physics-moved scenarios have no half-space truth to recover; "
+        "what an\nuncorrected half-space fit reads there is reported, not "
+        "scored. predicted_bias is\nwhat the scenario's own force law implies "
+        "at the true contact point:"
     )
     print(
-        "worst |model_bias / predicted_bias - 1| over the physics-moved "
-        f"scenarios: {100 * float(worst):.2f} %"
+        moved[["scenario", "model_bias", "ratio_to_true", "predicted_bias"]]
+        .round(4)
+        .to_string(index=False)
     )
     pathologies = df[(df.method == "pipeline") & df.pathology]
     print(

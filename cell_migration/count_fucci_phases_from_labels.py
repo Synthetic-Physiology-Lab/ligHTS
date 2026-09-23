@@ -1,6 +1,6 @@
 """Optional add-on -- FUCCI cell-cycle phase fractions from saved labels.
 
-Runs *after* ``segment_track_stack.py`` and requires no change to it. Instead of
+Runs *after* ``segment_track_stack.py``. Instead of
 re-segmenting the nuclei, it reuses the cell masks already saved as
 ``{stem}_cellpose_labels.tif`` and re-reads the matching original stack
 (``{stem}.nd2`` / ``.tif`` / ``.tiff``, still in the folder) only to sample the
@@ -25,8 +25,7 @@ two phase percentages need not sum to exactly 100.
 Because it scores the whole-cell masks from the tracking step (not a dedicated
 nuclear segmentation), the classification relies on the FUCCI reporters being
 nuclear-localised so that whichever reporter dominates the cell also dominates
-its nucleus; this is the same dominant-reporter rule as ``count_fucci_phases.py``
-but without a second Cellpose run.
+its nucleus. No second Cellpose run is needed.
 
 Grouping
 --------
@@ -124,7 +123,7 @@ def read_stack(in_file: Path) -> np.ndarray:
         return _to_tcyx(series.asarray(), series.axes)
 
 
-# --- GUI helpers (match count_fucci_phases.py) -----------------------------
+# --- GUI helpers ----------------------------------------------------------
 
 
 def gui_select_folder(title: str) -> str:

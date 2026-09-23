@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
-"""
-HOLOreader (registered) — grooves vertical + subpixel translation registration before cropping.
+"""Convert phase-encoded holographic frames into registered 8-bit TIFF stacks.
 
-Registration (simple & robust, widely used):
-- **Phase correlation** (FFT-based) with a 2-D Hanning window (cv2.phaseCorrelate) to get subpixel dx,dy.
-- Work on rotated frames (grooves vertical). Use intersection of valid masks and Hanning window to
-  avoid NaN borders and reduce edge effects. Translate with cv2.warpAffine.
-- Minimal & deterministic: no ECC refinement to keep the update small unless requested.
+Frames are grouped by field of view from their file names. For each field the
+script:
 
-Other steps unchanged: phase→height, pitch estimate, largest-square crop, fixed 8-bit window.
+- converts the 16-bit phase of the first frame to height in micrometres using
+  the per-frame metadata and ``SCALE_UM_PER_RAD = WAVELENGTH_UM / (2 pi DELTA_N)``;
+- finds the dominant grating angle by 2-D FFT, rotates the frames so the grooves
+  run vertically, and estimates the pitch by 1-D FFT;
+- registers the rotated frames to one another by FFT phase correlation
+  (``cv2.phaseCorrelate`` on a 2-D Hanning window) for subpixel dx, dy, and
+  applies the shift with ``cv2.warpAffine``. The correlation runs on the
+  intersection of the valid masks, so NaN borders do not drive the result;
+- crops the largest NaN-free square common to all registered frames and maps the
+  heights to 8 bit over the fixed ``WINDOW_MIN_UM``..``WINDOW_MAX_UM`` window;
+- writes one multi-page TIFF per field plus a median single-page TIFF, carrying
+  the calibration, the per-frame shifts and this script's version and SHA-256 in
+  the TIFF metadata.
 """
 
 from __future__ import annotations
@@ -34,7 +42,10 @@ from collections import defaultdict
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # ----------------------------- Constants ------------------------------
-DELTA_N: float = 0.00278 # updated following calibration
+# Gel-to-medium refractive index difference, from the nanoindentation-anchored
+# multimodal calibration: see multimodal_calibration.calibrate, run through
+# run_calibration.py, which reports delta_n with its confidence interval.
+DELTA_N: float = 0.00278
 WAVELENGTH_UM: float = 0.635
 SCALE_UM_PER_RAD: float = WAVELENGTH_UM / (2.0 * math.pi * DELTA_N)
 WINDOW_MIN_UM: float = -25.0
@@ -376,7 +387,7 @@ def tiffinfo_with_pixel_size(
     info[282] = float(ppc)
     info[283] = float(ppc)
     info[296] = 3
-    info[305] = "HOLOreader_registered.py"
+    info[305] = f"holo_to_tiff.py v{__version__}"
     return info
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Synthetic Groove Validator v2.1 - Automated validation of groove analyzer against synthetic datasets.
+Synthetic Groove Validator - Automated validation of groove analyzer against synthetic datasets.
 
 Validates analyzer outputs (pitch, depth, angle, gel height) against ground truth from synthetic
 generator with GUM-compliant uncertainty thresholds and ISO-compliant acceptance criteria.
@@ -380,8 +380,8 @@ def analyze_one(
             "Analyzer module does not expose analyze_tiff(...) or analyze_file(...).",
         )
 
-    # STRICT: an analyzer that returned an in-band error dict is an error, not a
-    # silent threshold failure. [GROOVE_C-04]
+    # An analyzer that returned an in-band error dict is an error, not a
+    # silent threshold failure.
     if isinstance(res, dict) and res.get("error"):
         return res, str(res["error"])
     res["pitch_meas_um"] = float(res.get("pitch_mean_um", res.get("pitch_um", np.nan)))
@@ -548,7 +548,7 @@ def verify_one(
         else float("nan")
     )
 
-    # Absolute-tolerance fallback kept: it reflects the instrument sensitivity
+    # Absolute-tolerance fallback: it reflects the instrument sensitivity
     # floor (2 px for pitch, 2 dz for depth), below which a percentage error is
     # not meaningful. A sample passes on MAPE OR on being within that floor.
     pitch_abs_tol_um = 2.0 * imaging.xy_um
@@ -574,12 +574,12 @@ def verify_one(
         or (np.isfinite(gel_abs_err) and height_mape <= cfg.height_mape_thresh_pct)
     )
 
-    # STRICT: an unavailable RMSE is not a pass. [GROOVE_C-03]
+    # An unavailable RMSE is not a pass.
     height_available = np.isfinite(height_rmse)
     height_pass = bool(height_available and height_rmse <= cfg.height_rmse_thresh_um)
 
-    # STRICT: actually evaluate reconstruction validity against the 0.5 floor,
-    # reading the key the analyzer really emits. [GROOVE_C-01]
+    # Evaluate reconstruction validity against the 0.5 floor, reading
+    # the key the analyzer emits.
     recon_prc = res.get("recon_valid_prc", np.nan)
     recon_frac = float(recon_prc) / 100.0 if np.isfinite(float(recon_prc)) else float("nan")
     recon_valid_pass = bool(np.isfinite(recon_frac) and recon_frac >= 0.5)
@@ -923,7 +923,7 @@ def main_cli(dataset_dir: str, analyzer_path: str, *, log_level: str) -> None:
     except Exception:
         LOG.exception("Validation failed")
         raise SystemExit(1)
-    # STRICT: a failed validation must be visible to the caller. [GROOVE_C-08]
+    # A failed validation must be visible to the caller.
     if summary.get("failed") or summary.get("errors"):
         raise SystemExit(
             f"{summary.get('failed', 0)}/{summary.get('total_samples', 0)} failed, "

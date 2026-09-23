@@ -716,7 +716,8 @@ def adaptive_bead_and_sfilter(
 ) -> tuple[float, float, int, float]:
     """Derive effective bead diameter and S-filter cutoff from imaging scale and heuristics."""
     # Effective lateral resolution (reported diagnostic only; must NOT drive the
-    # roughness bandwidth, otherwise binning/objective changes shift lambda_s -> B2).
+    # roughness bandwidth, otherwise binning or objective changes would
+    # shift lambda_s).
     d_eff_um = max(float(bead_diam_nom_um), 2.0 * float(xy_um_per_px))
     r_eff_um = 0.5 * d_eff_um
     r_px = max(int(MIN_ENVELOPE_RADIUS_PX), math.ceil(r_eff_um / max(xy_um_per_px, 1e-9)))
@@ -982,7 +983,7 @@ def save_residual_map(
         np.ma.masked_where(~roi_bool, residual_um),
         origin="lower",
         extent=extent,
-        cmap="RdBu_r",  # diverging blue(-)-white(0)-red(+), matches residuals.svg
+        cmap="RdBu_r",  # diverging blue(-)-white(0)-red(+)
         norm=norm,
         aspect="equal",
     )

@@ -1,6 +1,6 @@
 """Optional add-on -- extended migration/morphology metrics from saved labels.
 
-Runs *after* ``segment_track_stack.py`` and requires no change to it. For every
+Runs *after* ``segment_track_stack.py``. For every
 ``{stem}_cellpose_labels.tif`` + ``{stem}_tracking.csv`` pair produced by the
 segmentation/tracking step, this script:
 

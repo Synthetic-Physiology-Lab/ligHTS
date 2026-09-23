@@ -180,7 +180,7 @@ def write_validation_csv(output_path: Path, results: list[SampleResult]) -> None
         output_path.write_text("note\nno rows\n", encoding="utf-8")
         return
 
-    # STRICT: union of keys so a failed (short) row cannot abort the report. [FLATGEL_C-01]
+    # Union of keys, so a failed (short) row cannot abort the report.
     fieldnames: list[str] = []
     for row in rows:
         for key in row:
@@ -980,7 +980,7 @@ def process_single_sample(
         )
 
     field_results = compare_fields(truth_row.row, measured, field_specs)
-    # STRICT: a sample with no comparable truth field is not a pass. [FLATGEL_C-02]
+    # A sample with no comparable truth field is not a pass.
     compared = [fr for fr in field_results if not fr.skipped]
     if not compared:
         return SampleResult(
@@ -1172,7 +1172,7 @@ def main() -> int:
         )
 
         print_validation_summary(summary)
-        # STRICT: non-zero exit on any failure or error. [FLATGEL_C-03]
+        # Non-zero exit on any failure or error.
         return 0 if (summary["failed"] == 0 and summary["errors"] == 0) else 1
 
 

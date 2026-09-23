@@ -48,6 +48,7 @@ which is present and empty in every real file - is filled with a warning.
 
 from __future__ import annotations
 
+import inspect
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -59,6 +60,8 @@ __all__ = [
     "SynthConfig",
     "Truth",
     "generate_curve",
+    "make_mechanics",
+    "scenario_mechanics",
     "write_curve",
 ]
 
@@ -204,6 +207,91 @@ def _layer_compression(delta_bulk_m, force_N, radius_m, tau_m, e_layer_Pa):
     with np.errstate(divide="ignore", invalid="ignore"):
         pressure = np.where(a2 > 0, force_N / (math.pi * a2), 0.0)
     return np.clip(pressure * tau_m / max(e_layer_Pa, 1e-9), 0.0, tau_m)
+
+
+def make_mechanics(
+    *,
+    s0_true_nm: float,
+    e_star_Pa: float,
+    radius_m: float,
+    thickness_um: float = math.inf,
+    layer_thickness_um: float = 0.0,
+    layer_ratio: float = 1.0,
+    grading_length_um: float = math.inf,
+    grading_ratio: float = 1.0,
+    grading_mode: str = "saturating",
+    work_of_adhesion_J_m2: float = 0.0,
+    relax_times_s: tuple = (),
+    relax_weights: tuple = (),
+):
+    """Return the forward model as a callable.
+
+    ``mechanics(s_nm, dt_s)`` is the force in newtons for a commanded
+    displacement history, with the surface at ``s0_true_nm``. This is the
+    single definition of the mechanics: ``generate_curve`` builds its
+    curves with it, and the validation predicts from it, so a prediction
+    cannot silently drift away from what was generated.
+
+    The instrument artefacts that ``generate_curve`` adds afterwards
+    (snap-in, slip, spike, deflection noise, drift, wobble) are not part
+    of it: they are not mechanics.
+    """
+    s0_true = s0_true_nm
+
+    def mechanics(s_nm: np.ndarray, dt_s: float) -> np.ndarray:
+        """Force in newtons for a commanded displacement history.
+        """
+        delta = np.clip(s_nm - s0_true, 0.0, None) * NM
+        if work_of_adhesion_J_m2 > 0:
+            d_grid, f_grid = _jkr_curve(
+                e_star_Pa, radius_m, work_of_adhesion_J_m2
+            )
+            order = np.argsort(d_grid)
+            out = np.interp(
+                s_nm * NM - s0_true * NM,
+                d_grid[order],
+                f_grid[order],
+                left=0.0,
+                right=f_grid[order][-1],
+            )
+            return np.where(s_nm * NM - s0_true * NM < d_grid.min(), 0.0, out)
+
+        span = max(float(np.nanmax(delta)) * 1.3, 1e-9)
+        d_bulk = np.linspace(0.0, span, 12000)
+        modulus = (
+            _graded_modulus(
+                d_bulk,
+                e_star_Pa,
+                radius_m,
+                grading_length_um * UM,
+                grading_ratio,
+                grading_mode,
+            )
+            if math.isfinite(grading_length_um)
+            else e_star_Pa
+        )
+        f_bulk = _hertz_force(d_bulk, modulus, radius_m)
+        if math.isfinite(thickness_um):
+            f_bulk = f_bulk * _dimitriadis_factor(
+                d_bulk, radius_m, thickness_um * UM
+            )
+        if layer_thickness_um > 0:
+            d_total = d_bulk + _layer_compression(
+                d_bulk,
+                f_bulk,
+                radius_m,
+                layer_thickness_um * UM,
+                max(layer_ratio, 1e-6) * e_star_Pa,
+            )
+        else:
+            d_total = d_bulk
+        elastic = np.interp(delta, d_total, f_bulk, left=0.0, right=f_bulk[-1])
+        elastic = np.where(delta > 0, elastic, 0.0)
+        if relax_times_s:
+            return _ting_generic(elastic, dt_s, relax_weights, relax_times_s)
+        return elastic
+
+    return mechanics
 
 
 # ----------------------------------------------------------------------
@@ -476,58 +564,20 @@ def generate_curve(
         + contact_offset_nm
     )
 
-    def mechanics(s_nm: np.ndarray, dt_s: float) -> np.ndarray:
-        """Force in newtons for a commanded displacement history.
-        """
-        delta = np.clip(s_nm - s0_true, 0.0, None) * NM
-        if work_of_adhesion_J_m2 > 0:
-            d_grid, f_grid = _jkr_curve(
-                e_star_Pa, radius_m, work_of_adhesion_J_m2
-            )
-            order = np.argsort(d_grid)
-            out = np.interp(
-                s_nm * NM - s0_true * NM,
-                d_grid[order],
-                f_grid[order],
-                left=0.0,
-                right=f_grid[order][-1],
-            )
-            return np.where(s_nm * NM - s0_true * NM < d_grid.min(), 0.0, out)
-
-        span = max(float(np.nanmax(delta)) * 1.3, 1e-9)
-        d_bulk = np.linspace(0.0, span, 12000)
-        modulus = (
-            _graded_modulus(
-                d_bulk,
-                e_star_Pa,
-                radius_m,
-                grading_length_um * UM,
-                grading_ratio,
-                grading_mode,
-            )
-            if math.isfinite(grading_length_um)
-            else e_star_Pa
-        )
-        f_bulk = _hertz_force(d_bulk, modulus, radius_m)
-        if math.isfinite(thickness_um):
-            f_bulk = f_bulk * _dimitriadis_factor(
-                d_bulk, radius_m, thickness_um * UM
-            )
-        if layer_thickness_um > 0:
-            d_total = d_bulk + _layer_compression(
-                d_bulk,
-                f_bulk,
-                radius_m,
-                layer_thickness_um * UM,
-                max(layer_ratio, 1e-6) * e_star_Pa,
-            )
-        else:
-            d_total = d_bulk
-        elastic = np.interp(delta, d_total, f_bulk, left=0.0, right=f_bulk[-1])
-        elastic = np.where(delta > 0, elastic, 0.0)
-        if relax_times_s:
-            return _ting_generic(elastic, dt_s, relax_weights, relax_times_s)
-        return elastic
+    mechanics = make_mechanics(
+        s0_true_nm=s0_true,
+        e_star_Pa=e_star_Pa,
+        radius_m=radius_m,
+        thickness_um=thickness_um,
+        layer_thickness_um=layer_thickness_um,
+        layer_ratio=layer_ratio,
+        grading_length_um=grading_length_um,
+        grading_ratio=grading_ratio,
+        grading_mode=grading_mode,
+        work_of_adhesion_J_m2=work_of_adhesion_J_m2,
+        relax_times_s=relax_times_s,
+        relax_weights=relax_weights,
+    )
 
 
     # threshold trips
@@ -783,3 +833,59 @@ def write_curve(path: Path, columns: dict, truth: Truth, header: dict) -> None:
     body = np.column_stack([columns[k] for k in columns])
     rows = "\n".join("\t".join(f"{v:.6f}" for v in row) for row in body)
     path.write_text("\n".join(lines) + "\n" + rows + "\n", encoding="utf-8")
+
+
+#: The ``generate_curve`` arguments that reach the force law. Everything else
+#: it takes is acquisition or an instrument artefact.
+MECHANICS_KEYS = (
+    "e_star_Pa",
+    "radius_um",
+    "thickness_um",
+    "layer_thickness_um",
+    "layer_ratio",
+    "grading_length_um",
+    "grading_ratio",
+    "grading_mode",
+    "work_of_adhesion_J_m2",
+    "relax_times_s",
+    "relax_weights",
+)
+
+
+def scenario_mechanics(scenario: str, s0_true_nm: float):
+    """The force law one scenario was generated with, contact at s0_true.
+
+    The arguments are read from :data:`SCENARIOS` over ``generate_curve``'s
+    own defaults, so a scenario that leaves one out is rebuilt with the value
+    the generator used. ``grading_mode`` and ``layer_ratio`` are only
+    available this way: the truth table records the modulus they produce, not
+    the mode or the ratio.
+
+    This is what lets the validation predict *forward* from the mechanics
+    instead of refitting the curve it is judging, and it returns the same
+    callable the curve was generated with rather than a second copy of the
+    formulas, so a prediction cannot drift away from what was generated.
+    """
+    defaults = {
+        name: parameter.default
+        for name, parameter in inspect.signature(
+            generate_curve
+        ).parameters.items()
+        if parameter.default is not inspect.Parameter.empty
+    }
+    declared = dict(SCENARIOS[scenario]["kw"])
+    kw = {key: declared.get(key, defaults[key]) for key in MECHANICS_KEYS}
+    return make_mechanics(
+        s0_true_nm=float(s0_true_nm),
+        e_star_Pa=float(kw["e_star_Pa"]),
+        radius_m=float(kw["radius_um"]) * UM,
+        thickness_um=float(kw["thickness_um"]),
+        layer_thickness_um=float(kw["layer_thickness_um"]),
+        layer_ratio=float(kw["layer_ratio"]),
+        grading_length_um=float(kw["grading_length_um"]),
+        grading_ratio=float(kw["grading_ratio"]),
+        grading_mode=str(kw["grading_mode"]),
+        work_of_adhesion_J_m2=float(kw["work_of_adhesion_J_m2"]),
+        relax_times_s=tuple(kw["relax_times_s"]),
+        relax_weights=tuple(kw["relax_weights"]),
+    )

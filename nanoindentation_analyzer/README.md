@@ -20,7 +20,7 @@ code/     pyproject.toml, setup.cfg, _common/, scripts/, verify.py
 ```bash
 # example: run against the unpacked archive wherever it lives
 set LIGHTS_DATA=/path/to/data
-python code/scripts/03_analyse.py
+python code/scripts/03_analyze.py
 ```
 
 ## Install
@@ -42,12 +42,12 @@ conda activate lights-indentation
 ```bash
 python code/scripts/01_synthesise.py    # the synthetic set + its truth table
 python code/scripts/02_validate.py      # recover that truth
-python code/scripts/03_analyse.py       # QC + pipeline over real datasets, defaults to `raw/` folder in `data/`
+python code/scripts/03_analyze.py       # QC + pipeline over real datasets, defaults to `raw/` folder in `data/`
 python code/scripts/04_statistics.py    # gel-level statistics
 python code/verify.py                   # six gates for control
 ```
 
-The chain takes about four minutes end to end, of which `03_analyse.py` is two.
+The chain takes about four minutes end to end, of which `03_analyze.py` is two.
 `python code/verify.py --full` re-runs the chain and then the gates.
 
 ## What is measured

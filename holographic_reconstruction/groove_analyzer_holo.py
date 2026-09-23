@@ -43,8 +43,8 @@ except ImportError:
     plt = None
 
 
-__version__ = "7.2.0-holo-aligned"
-LOGGER = logging.getLogger("groove_analyzer_holo_v7aligned")
+__version__ = "7.2.0"
+LOGGER = logging.getLogger(__name__)
 
 
 def sha256_file(path: str) -> str:
