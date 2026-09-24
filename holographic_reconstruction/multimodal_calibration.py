@@ -64,7 +64,7 @@ HPI_PHASE_TAG = 40092  # private tag carrying "Min (0) = .. Max (65535) = .."
 MEDIUM_INDEX = 1.3316
 
 # Earlier hard-coded value in the acquisition script, retained only for
-# comparison; holo_to_tiff.py now uses the calibrated DELTA_N.
+# comparison; holo_to_tiff.py has been since corrected to use the calibrated DELTA_N.
 LEGACY_DELTA_N = 0.0064
 LEGACY_HPI_XY_UM = 0.54
 

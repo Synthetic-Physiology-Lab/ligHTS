@@ -52,7 +52,7 @@ PAIRS = (
 )
 
 GROUP_LABELS = {
-    "batch": ("Lot:", "Lot 9167, 28-30°C", "Lot A326, 21-25°C", "s"),
+    "batch": ("Lot:", "Lot 9167, 26-30°C", "Lot A326, 21-25°C", "s"),
     "storage": ("Timepoint:", "Fresh", "1 month old", "^"),
 }
 
