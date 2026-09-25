@@ -4,8 +4,11 @@
 Frames are grouped by field of view from their file names. For each field the
 script:
 
-- converts the 16-bit phase of the first frame to height in micrometres using
-  the per-frame metadata and ``SCALE_UM_PER_RAD = WAVELENGTH_UM / (2 pi DELTA_N)``;
+- converts the 16-bit phase to native HoloMonitor AppSuite phase units using the
+  per-frame metadata (one native unit = one wavelength of optical path), then to an
+  uncalibrated encoding height with STORAGE_SCALE_PER_UM. This is a storage
+  scale for 8-bit conversion that does not correspond to a physical depth:
+  calibrated depths are obtained in ``calibration/`` as ``C * phase`` (see calibration README.md);
 - finds the dominant grating angle by 2-D FFT, rotates the frames so the grooves
   run vertically, and estimates the pitch by 1-D FFT;
 - registers the rotated frames to one another by FFT phase correlation
@@ -42,16 +45,29 @@ from collections import defaultdict
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # ----------------------------- Constants ------------------------------
-# Gel-to-medium refractive index difference, from the nanoindentation-anchored
-# multimodal calibration: see multimodal_calibration.calibrate, run through
-# run_calibration.py, which reports delta_n with its confidence interval.
-DELTA_N: float = 0.00278
+# HoloMonitor AppSuite stores phase in units of one wavelength of optical path
+# (optical path length = phase * lambda).
+#
+# STORAGE_UM_PER_UNIT only fixes the scale used to store phase as an 8-bit
+# "height" (15.79 um per native unit, the scale of every archived Figure 6 plate
+# field; grooves fit the -25..50 um window without clipping).
+# The encoding is written to each TIFF and undone exactly by
+# calibration/scripts/step2_measure_plates.py.
+#
+# Calibrated physical depth = C_UM_PER_NATIVE_UNIT * phase, where the phase is
+# measured with the calibration estimator (calibration/scripts/groovekit.py).
+# C is locked by the nanoindentation-anchored calibration
+# (calibration/outputs/calibration_constants.json; SI Note S15) and corresponds
+# to delta_n_eff = WAVELENGTH_UM / C = 0.0197. 
 WAVELENGTH_UM: float = 0.635
-SCALE_UM_PER_RAD: float = WAVELENGTH_UM / (2.0 * math.pi * DELTA_N)
+STORAGE_UM_PER_UNIT = 15.79 # um/unit, uncalibrated value for 8-bit conversion
+C_UM_PER_NATIVE_UNIT: float = 32.172      # +/- 1.96; reference only
 WINDOW_MIN_UM: float = -25.0
 WINDOW_MAX_UM: float = +50.0
 NEAREST_SET: Tuple[int, int, int] = (40, 60, 80)
-DEFAULT_PX_UM: float = 0.54
+DEFAULT_PX_UM: float = 0.553711           # 25400 / 45872.308 (TIFF XResolution)
+REG_RESP_MIN: float = 0.3                 # min phase-correlation response for a frame to enter the median
+REG_MIN_FRAMES: int = 3                   # fewer registered frames -> field flagged 'Registration QC: FAIL'
 
 
 # ------------------------------ Utilities -----------------------------
@@ -171,10 +187,10 @@ def parse_phase_minmax(desc: Optional[str]) -> Tuple[float, float]:
 def u16_to_height_um(
     u16: NDArray[np.uint16], min_rad: float, max_rad: float
 ) -> NDArray[np.float32]:
-    """ phase to micron conversion """
+    """ native phase (wavelength units) to uncalibrated encoding height (um) """
     u = u16.astype(np.float32)
     phi = min_rad + (u / 65535.0) * (max_rad - min_rad)
-    return phi * float(SCALE_UM_PER_RAD)
+    return phi * float(STORAGE_UM_PER_UNIT)
 
 
 def rescale_height_to_u8(
@@ -410,7 +426,7 @@ def build_description(
         f"Estimated pitch (µm): {pitch_um:.3f}",
         f"Nearest label: {nearest}",
         f"Pixel size: {px_um:.6f} µm/px (X==Y)",
-        f"Phase→Height: h = φ * λ / (2πΔn), λ={WAVELENGTH_UM} µm, Δn={DELTA_N}, scale≈{SCALE_UM_PER_RAD:.5f} µm/rad",
+        f"8-bit storage scale≈{STORAGE_UM_PER_UNIT:.2f} µm/unit (uncalibrated)",
         f"Output mapping: {WINDOW_MIN_UM}..{WINDOW_MAX_UM} µm → 0..255",
         f"Tool: holo_to_tiff.py v{__version__}",
         f"Tool SHA-256: {TOOL_SHA256}",
@@ -489,12 +505,18 @@ def process_fov(
         aligned_masks.append(am)
         shifts.append((dx, dy, resp))
 
-    # Intersection of masks AFTER registration + enforce finite pixels across all frames
+    # Frames whose phase-correlation response is below REG_RESP_MIN did not register
+    # (the shift is unreliable); they are kept in the audit stack but excluded from
+    # the mask intersection and from the median, which would otherwise average
+    # out-of-phase grooves and attenuate the relief.
+    good = [0] + [i for i in range(1, len(aligned)) if shifts[i][2] >= REG_RESP_MIN]
+
+    # Intersection of masks AFTER registration + enforce finite pixels (good frames)
     m_all = aligned_masks[0].copy()
-    for m in aligned_masks[1:]:
-        cv2.bitwise_and(m_all, m, dst=m_all)
-    for arr in aligned:
-        finite = (np.isfinite(arr)).astype(np.uint8) * 255
+    for i in good[1:]:
+        cv2.bitwise_and(m_all, aligned_masks[i], dst=m_all)
+    for i in good:
+        finite = (np.isfinite(aligned[i])).astype(np.uint8) * 255
         cv2.bitwise_and(m_all, finite, dst=m_all)
 
     rect = largest_valid_square(m_all)
@@ -510,8 +532,9 @@ def process_fov(
         u8 = rescale_height_to_u8(c, WINDOW_MIN_UM, WINDOW_MAX_UM)
         frames_u8.append(Image.fromarray(u8))
 
-    # Robust single-frame projection: per-pixel median (height domain)
-    stack = np.stack(cropped_float, axis=0)
+    # Robust single-frame projection: per-pixel median (height domain) of the
+    # frames that registered
+    stack = np.stack([cropped_float[i] for i in good], axis=0)
     fused_h = np.nanmedian(stack, axis=0).astype(np.float32)
     fused_u8 = rescale_height_to_u8(fused_h, WINDOW_MIN_UM, WINDOW_MAX_UM)
     fused_img = Image.fromarray(fused_u8)
@@ -545,25 +568,37 @@ def process_fov(
     # Write single-frame fused output as well
     fused_name = f"{fov}_{label}_MEDIAN.tif" if label != -1 else f"{fov}_NA_MEDIAN.tif"
     fused_path = os.path.join(out_dir, fused_name)
+    reg_qc = "PASS" if len(good) >= REG_MIN_FRAMES else "FAIL"
     info_single = tiffinfo_with_pixel_size(
         px_um,
         desc_out
-        + "\nProjection: per-pixel MEDIAN in height domain before 8-bit mapping.",
+        + "\nProjection: per-pixel MEDIAN in height domain before 8-bit mapping."
+        + f"\nFrames in median: {[i + 1 for i in good]} (registration response >= {REG_RESP_MIN})"
+        + f"\nRegistration QC: {reg_qc} ({len(good)} of {len(aligned)} frames; minimum {REG_MIN_FRAMES})",
     )
     fused_img.save(fused_path, compression="tiff_deflate", tiffinfo=info_single)
     logging.info("FOV %s: wrote %s", fov, fused_path)
 
 
 def main() -> None:
-    """ Main function """
+    """ Main function (GUI by default; --input/--out/--px for scripted runs) """
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--input", help="folder with the raw per-frame TIFFs (no GUI)")
+    ap.add_argument("--out", help="output folder (default: <input>/stacks_8bit_square)")
+    ap.add_argument("--px", type=float, default=DEFAULT_PX_UM, help="pixel size, um/px")
+    args = ap.parse_args()
     setup_logging()
-    folder, px_um = ask_folder_and_scale()
+    if args.input:
+        folder, px_um = args.input, float(args.px)
+    else:
+        folder, px_um = ask_folder_and_scale()
     all_files = find_tiffs(folder)
     by_fov = group_by_fov(all_files)
     if not by_fov:
         logging.error("No candidate stacks found.")
         sys.exit(4)
-    out_dir = os.path.join(folder, "stacks_8bit_square")
+    out_dir = args.out or os.path.join(folder, "stacks_8bit_square")
     for fov, items in tqdm(by_fov.items(), desc="Process FOVs"):
         if len(items) < 5:
             logging.warning(

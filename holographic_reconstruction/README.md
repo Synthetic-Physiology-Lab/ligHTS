@@ -11,9 +11,10 @@ Workflow
 2) GUI: select folder containing frames and enter pixel size (µm/px).
 3) Group files by FOV from names like 'Well 1-5 3.tif' → FOV=5.
 4) First frame per FOV:
-     - Convert 16-bit phase→height (µm) using metadata
+     - Convert 16-bit phase→ uncalibrated height using metadata
        'Min (0) = ... Max (65535) = ...' and
-         h = φ * λ / (2πΔn) with Δn=0.00278, λ=0.635 µm (physical parameters of the system, Δn was corrected based on the calibration via nanoindentation)
+         λ=0.635 µm, STORAGE_UM_PER_UNIT = 15.79 um/unit (storage encoding for 8-bit transformation, 
+        does not correspond to physical height. See calibration for more)
      - Estimate dominant grating angle via 2D FFT (grating normal).
      - Rotate to make grooves vertical; estimate pitch (µm) via 1D FFT.
 5) Apply the same rotation to all frames; compute the largest
@@ -21,35 +22,10 @@ Workflow
 6) Map cropped heights to 8-bit.
 7) Save multi-page TIFF as '{FOV}_{40|60|80}.tif' with calibration and a median single-page TIFF.
 8) Run groove_analyzer_holo.py
-9) GUI: select folder containing stack and enter pixel size (µm/px), z-slice (µm/gray level), Z0 (µm level corresponding to black gray = 0 pixels)
+9) GUI: select folder containing stack and enter pixel size (µm/px), z-slice (uncalibrated height/gray level),
+   Z0 (height level corresponding to black gray = 0 pixels)
 10) Analyze all stacks, extracting surface geometry parameters
 11) Saves processed data
-
-Optional calibration against nanoindentation and confocal images
--------------------
-Both scripts expect this layout next to the code (or next to the folder given by
-`run_calibration.py --base`). Note that `HPI/HPI` must contain **one subfolder per
-field**, each holding that field's repeat TIFF frames; raw frames placed directly in
-`HPI/HPI` are skipped and both scripts stop with an error.
-
-```
-holographic_reconstruction/
-├── tiff/                      # TIFF version of the confocal calibration stacks
-│   └── *.tif
-├── conf_out/
-│   └── groove_recap.csv       # produced by groove_analyzer.py
-├── HPI/
-│   └── HPI/
-│       ├── <field_1>/         # e.g. Prefunction1
-│       │   └── *.tif          # repeat frames of that field
-│       └── <field_2>/
-│           └── *.tif
-└── NanoindentationChiaro/     # raw nanoindentation data
-```
-
-1) run `run_calibration.py` (add `--base PATH` if the folders above live elsewhere)
-2) run `make_figure.py` to get the final image. It draws the HPI panel from the first
-   field folder alphabetically; use `--field <name>` to pick a different one.
 
 Optional validation
 ---------------------
@@ -58,16 +34,17 @@ To verify groove_analyzer_holo.py credibility, run validation pipeline:
 2) Use synthetic_groove_validator_holo.py --gui to select the groove_analyzer_holo.py as the analyzer to test and the synthetic data folder as test dataset
 3) Compare performance reading the VALIDATION_REPORT.md file
 
+Optional calibration against nanoindentation and confocal images
+-------------------
+A calibration was run to map holographic phase imaging data against physical height extracted
+via nanoindentation and optical height obtained by confocal microscopy. To run the calibration,
+and extract the effective Δn refractive index, move to the calibration/ subfolder and follow the README.md instructions
+
 Optical and physical constants of the model
 ---------------------------------------------
 
 - Wavelength λ = 0.635 µm
-- Refractive index contrast Δn = 0.00278
-- Phase → height scale  
-  \[
-  h = \phi \cdot \frac{\lambda}{2\pi\Delta n} \approx 36.35\ \mu m/\text{rad}
-  \]
-- Height window mapped to 8-bit output
+- STORAGE_UM_PER_UNIT = 15.79 um per native unit (height window mapped to 8-bit output, uncalibrated)
 - Groove pitch labels snapped to nearest of 40, 60, 80 µm
 
 Notes
@@ -87,10 +64,10 @@ Notes
   generated `VALIDATION_REPORT.md`.
 
 - The analyzer code is intended for the sole use of analyzing the datasets and extracting the hydrogel
-  geometries displayed in figure 6 e-f of the manuscript "LigHTS: Biomimetic Hydrogel Photo-Fabrication for Imaging-Based Ultra-High-Throughput Screening" 
+  geometries displayed in figure 6 e of the manuscript "LigHTS: Biomimetic Hydrogel Photo-Fabrication for Imaging-Based Ultra-High-Throughput Screening" 
 
 - The 'holo_to_tiff.py' code to convert from holographic images to tiff stacks and obtain the median is also used to
-  isolate cells for subsequent segmentation, tracking, and extract migration parameters reported in figure 6 d
+  isolate cells for subsequent segmentation, tracking, and extract migration parameters reported in Figure 6d
   and supplementary figures and videos of the manuscript "LigHTS: Biomimetic Hydrogel Photo-Fabrication for Imaging-Based Ultra-High-Throughput Screening" 
 
 ## Input requirements
@@ -127,15 +104,6 @@ To run the geometrical analysis on folders containing TIFF stacks and divided pe
 python groove_analyzer_holo.py
 ```
 ## Advanced Options
-To calibrate the holographic reconstructor against nanoindentation and confocal datasets, after creating a folder tree as described before:
-a) run the ancillary code via:
-```
-python run_calibration.py
-```
-b) generate figure panel via:
-```
-python make_figure.py
-```
 
 To reproduce synthetic dataset validation process and obtain metrics as reported in VALIDATION_REPORT.md:
 
@@ -164,7 +132,7 @@ For each input TIFF 'FILE.tif', the script creates a per-file subfolder `FILE_pr
 Per-period arrays are also written whenever the corresponding values are available:
 
 - '_pitches_um.csv' – raw per-period pitch values (µm)
-- '_depths_um.csv' – raw per-period depth values (µm)
+- '_depths_um.csv' – raw per-period depth values (µm, uncalibrated)
 
 In the root directory (the selected folder, or the input file's parent):
 - 'groove_recap.csv' – one-row-per-file summary of all key metrics

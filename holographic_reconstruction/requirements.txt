@@ -7,3 +7,4 @@ opencv-python-headless==4.9.0.80
 pillow==10.0.1
 tifffile==2023.7.10
 tqdm==4.66.1
+nd2==0.10.3
